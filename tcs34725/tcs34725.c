@@ -151,7 +151,7 @@ ret_code_t tcs34725_set_gain(tcs34725_instance_t const * p_instance,
 }
 
 ret_code_t tcs34725_read_rgbc(tcs34725_instance_t const * p_instance,
-                               tcs34725_color_data_t *     rgbc_str,
+                               tcs34725_rgbc_data_t *     rgbc_str,
                                tcs34725_rgbc_callback_t    user_cb)
 {
     ret_code_t err_code;
@@ -168,7 +168,7 @@ ret_code_t tcs34725_read_rgbc(tcs34725_instance_t const * p_instance,
     return err_code;
 }
 
-void tcs34725_rgbc_print(tcs34725_color_data_t * color_str)
+void tcs34725_rgbc_print(tcs34725_rgbc_data_t * color_str)
 {
     uint16_t c_red,c_green,c_blue;
 

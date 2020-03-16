@@ -41,8 +41,7 @@ typedef struct
     uint16_t red;
     uint16_t green;
     uint16_t blue;
-//    uint8_t reg_addr;
-} tcs34725_color_data_t;
+} tcs34725_rgbc_data_t;
 
 typedef struct
 {
@@ -124,7 +123,7 @@ typedef enum
  */
 typedef void (* tcs34725_data_callback_t)(ret_code_t result, tcs34725_reg_data_t * p_raw_data);
 
-typedef void (* tcs34725_rgbc_callback_t)(ret_code_t result, tcs34725_color_data_t * p_raw_data);
+typedef void (* tcs34725_rgbc_callback_t)(ret_code_t result, tcs34725_rgbc_data_t * p_raw_data);
 
 typedef void (* tcs34725_threshold_callback_t)(ret_code_t result, tcs34725_threshold_data_t * p_raw_data);
 
@@ -153,10 +152,10 @@ ret_code_t tcs34725_set_gain(tcs34725_instance_t const * p_instance,
                                  tcs34725_gain_t gain_val);
 
 ret_code_t tcs34725_read_rgbc(tcs34725_instance_t const * p_instance,
-                               tcs34725_color_data_t *     rgbc_str,
+                               tcs34725_rgbc_data_t *     rgbc_str,
                                tcs34725_rgbc_callback_t    user_cb);
 
-void tcs34725_rgbc_print(tcs34725_color_data_t * color_str);
+void tcs34725_rgbc_print(tcs34725_rgbc_data_t * color_str);
 
 ret_code_t tcs34725_set_threshold(tcs34725_instance_t const * p_instance,
                                   tcs34725_threshold_lh_t threshold_low_high,

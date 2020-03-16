@@ -82,7 +82,7 @@
 
 #define APP_BLE_CONN_CFG_TAG            1                                           /**< A tag identifying the SoftDevice BLE configuration. */
 
-#define DEVICE_NAME                     "Nordic_UART"                               /**< Name of device. Will be included in the advertising data. */
+#define DEVICE_NAME                     "Nordic_TCS34725"                           /**< Name of device. Will be included in the advertising data. */
 #define NUS_SERVICE_UUID_TYPE           BLE_UUID_TYPE_VENDOR_BEGIN                  /**< UUID type for the Nordic UART Service (vendor specific). */
 
 #define APP_BLE_OBSERVER_PRIO           3                                           /**< Application's BLE observer priority. You shouldn't need to modify this value. */
@@ -126,6 +126,11 @@ static ble_uuid_t m_adv_uuids[]          =                                      
 };
 
 
+/*@TCS34725
+ *
+ */
+#include "tcs34725.h"
+
 /** @mlx90614
  */
 #include "nrf_drv_clock.h"
@@ -134,7 +139,6 @@ static ble_uuid_t m_adv_uuids[]          =                                      
 #include "nrf_twi_sensor.h"
 #include "nrf_delay.h"
 #include "math.h"
-#include "mlx90614.h"
 #include "stdio.h"
 #include "nrf_delay.h"
 
@@ -142,8 +146,8 @@ static ble_uuid_t m_adv_uuids[]          =                                      
 #define MAX_PENDING_TRANSACTIONS 20
 
 //TWI PIN
-#define MLX90614_SDA_PIN 28
-#define MLX90614_SCL_PIN 29
+#define TCS34725_SDA_PIN 28
+#define TCS34725_SCL_PIN 29
 
 //Macro that simplifies defining a TWI transaction manager instance.
 NRF_TWI_MNGR_DEF(m_nrf_twi_mngr, MAX_PENDING_TRANSACTIONS, TWI_INSTANCE_ID);
@@ -152,8 +156,9 @@ NRF_TWI_MNGR_DEF(m_nrf_twi_mngr, MAX_PENDING_TRANSACTIONS, TWI_INSTANCE_ID);
 NRF_TWI_SENSOR_DEF(sensor_instance, &m_nrf_twi_mngr, MAX_PENDING_TRANSACTIONS);
 
 //Macro that creates sensor instance.
-MLX90614_INSTANCE_DEF(mlx90614_instance, &sensor_instance, MLX90614_ADDR);
+TCS34725_INSTANCE_DEF(tcs34725_instance, &sensor_instance, TCS34725_ADDR);
 
+tcs34725_rgbc_data_t tcs34725_rgbc_str;
 
 /*@FreeRTOS
  *
@@ -168,10 +173,8 @@ MLX90614_INSTANCE_DEF(mlx90614_instance, &sensor_instance, MLX90614_ADDR);
 #include "fds.h"
 
 static TaskHandle_t m_led_toggle_thread;
-static TaskHandle_t m_mlx_rd_temp_thread;
-static TaskHandle_t m_mlx_rd_emi_thread;
-static TaskHandle_t m_ble_mlx_temp_thread;
-static TaskHandle_t m_ble_mlx_emi_thread;
+static TaskHandle_t m_tcs_read_rgbc_thread;
+static TaskHandle_t m_ble_tcs_rgbc_send_thread;
 
 #if NRF_LOG_ENABLED
 static TaskHandle_t m_logger_thread;                                /**< Definition of Logger thread. */
@@ -318,63 +321,12 @@ static void nus_data_handler(ble_nus_evt_t * p_evt)
     if(strcmp(str_cmd,"000")!=0)
     {
         printf("mode select\r\n");
-        mlx90614_cmd_func(str_cmd, str_data);
+//        mlx90614_cmd_func(str_cmd, str_data);
     }
 }
 /**@snippet [Handling the data received over BLE] */
 
 
-static void mlx_rd_emi_thread(void *arg);
-static void ble_mlx_emi_thread(void *arg);
-
-void mlx90614_cmd_func(char *str_cmd, char *str_data)
-{
-    printf("\r\nCMD : %s\r\n",str_cmd);
-    printf("DATA : %s\r\n",str_data);
-    for(int i=0;i<3;i++)
-    {
-        printf("data[%d] : %c\r\n",i,str_data[i]);
-    }
-
-    if(strcmp(str_cmd,"REM")==0)   //Read Emissivity
-    {
-        printf("str REM\r\n");
-//        xTaskNotifyGive(m_mlx90614_rd_emi_thread);
-        if (pdPASS != xTaskCreate(mlx_rd_emi_thread, "MLX90614_RD_EMI", configMINIMAL_STACK_SIZE+10, NULL, 2, &m_mlx_rd_emi_thread))
-        {
-            APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
-        }
-        if (pdPASS != xTaskCreate(ble_mlx_emi_thread, "MLX90614_BLE_RD_EMI", configMINIMAL_STACK_SIZE+30, NULL, 2, &m_ble_mlx_emi_thread))
-        {
-            APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
-        }
-    }
-    else if(strcmp(str_cmd,"CEM")==0)  //Change Emissivity
-    {
-        printf("str CEM\r\n");
-    }
-    else if(strcmp(str_cmd,"PAS")==0)  //Set Passive Mode
-    {
-        printf("str PAS\r\n");
-    }
-    else if(strcmp(str_cmd,"ACT")==0)  //Set Active Mode
-    {
-        printf("ACT\r\n");
-    }
-    else if(strcmp(str_cmd,"SLP")==0)  //Set Sleep Mode
-    {
-        printf("SLP\r\n");
-    }
-    else if(strcmp(str_cmd,"WKU")==0)  //Set Wakeup
-    {
-        printf("WKU\r\n");
-    }
-    else
-    {
-        printf("matching x, %s, %d\r\n",str_cmd,strcmp(str_cmd,"REM"));
-        
-    }
-}
 
 
 
@@ -906,9 +858,9 @@ static void twi_config(void)
     uint32_t err_code;
     
     nrf_drv_twi_config_t const config={
-      .scl=MLX90614_SCL_PIN,
-      .sda=MLX90614_SDA_PIN,
-      .frequency=NRF_TWI_FREQ_100K,
+      .scl=TCS34725_SCL_PIN,
+      .sda=TCS34725_SDA_PIN,
+      .frequency=NRF_TWI_FREQ_400K,
       .interrupt_priority=APP_IRQ_PRIORITY_MID,
       };
     
@@ -916,84 +868,90 @@ static void twi_config(void)
     APP_ERROR_CHECK(err_code);
 }
 
-void mlx90614_read_temp_cb(ret_code_t result, mlx90614_reg_data_t * p_raw_data)
-{
-    uint8_t crc_value;
 
-    if (result != NRF_SUCCESS)
+
+
+/*@Callback
+ */
+void tcs34725_read_reg_cb(ret_code_t result, tcs34725_reg_data_t * p_raw_data)
+{
+    if(result!=NRF_SUCCESS)
     {
-        NRF_LOG_WARNING("Read Temperature Callback Error : %d", (int)result);
+        NRF_LOG_INFO("TCS34725 register read fail");
         return;
     }
+    p_raw_data->reg_addr&=0x1F;
 
-    if(p_raw_data->pec!=mlx90614_crc_cal(p_raw_data,MLX90614_Read))
+    switch(p_raw_data->reg_addr)
     {
-        NRF_LOG_WARNING("MLX90614 Read temperature CRC doesn't match");
-        NRF_LOG_INFO("PEC : %X  CRC : %X",p_raw_data->pec,mlx90614_crc_cal(p_raw_data,MLX90614_Read));
-    }
-    else
-    {
-//        xTaskNotifyGive(m_mlx90614_thread);
-        xTaskNotify(m_ble_mlx_temp_thread, p_raw_data->reg_data, eSetValueWithOverwrite);
+        case TCS34725_REG_ENABLE :
+            NRF_LOG_INFO("Enable register : %X",p_raw_data->reg_data);
+            break;
+        case TCS34725_REG_TIMING :
+            NRF_LOG_INFO("Timing register : %X",p_raw_data->reg_data);
+            break;
+        case TCS34725_REG_WAIT_TIME :
+            NRF_LOG_INFO("Wait time register : %X",p_raw_data->reg_data);
+            break;
+        case TCS34725_REG_PERSISTENCE :
+            NRF_LOG_INFO("Persistence register : %X",p_raw_data->reg_data);
+            break;
+        case TCS34725_REG_CONFIG :
+            NRF_LOG_INFO("Configuration register : %X",p_raw_data->reg_data);
+            break;
+        case TCS34725_REG_CONTROL :
+            NRF_LOG_INFO("Control register : %X",p_raw_data->reg_data);
+            break;
+        case TCS34725_REG_ID :
+            NRF_LOG_INFO("ID register : %X",p_raw_data->reg_data);
+            break;
+        case TCS34725_REG_STATUS :
+            NRF_LOG_INFO("Status register : %X",p_raw_data->reg_data);
+            break;
+        default :
+            break;
     }
 }
 
-
-void mlx90614_read_emissivity_cb(ret_code_t result, mlx90614_reg_data_t * p_raw_data)
+void tcs34725_rgbc_cb(ret_code_t result, tcs34725_rgbc_data_t * p_raw_data)
 {
-    uint8_t crc_value;
-
-    if (result != NRF_SUCCESS)
+    if(result!=NRF_SUCCESS)
     {
-        NRF_LOG_WARNING("Read Emissivity Callback Error : %d", (int)result);
+        NRF_LOG_INFO("tcs rgbc callback failed");
         return;
-    }    
+    }
+    tcs34725_rgbc_print(p_raw_data);
 
-    if(p_raw_data->pec!=mlx90614_crc_cal(p_raw_data,MLX90614_Read))
-    {
-        NRF_LOG_WARNING("MLX90614 Read emissivity CRC doesn't match");
-        NRF_LOG_INFO("PEC : %X  CRC : %X",p_raw_data->pec,mlx90614_crc_cal(p_raw_data,MLX90614_Read));
-    }
-    else
-    {   
-        printf("emissivity cb\r\n");
-        xTaskNotify(m_ble_mlx_emi_thread, p_raw_data->reg_data, eSetValueWithOverwrite);
-    }
+    tcs34725_rgbc_str.red=(int)((double)p_raw_data->red/p_raw_data->clear*255);
+    tcs34725_rgbc_str.green=(int)((double)p_raw_data->green/p_raw_data->clear*255);
+    tcs34725_rgbc_str.blue=(int)((double)p_raw_data->blue/p_raw_data->clear*255);
+
+    printf("clear : %d, red : %d, blue : %d, green : %d\r\n",
+            p_raw_data->clear,p_raw_data->red,p_raw_data->green,p_raw_data->blue);
+
+//    xTaskNotify(m_ble_tcs_rgbc_send_thread, p_raw_data, eSetValueWithOverwrite);
+    xTaskNotifyGive(m_ble_tcs_rgbc_send_thread);
 }
 
+void tcs34725_read_thr_cb(ret_code_t result, tcs34725_threshold_data_t * p_reg_data)
+{
+    if(result!=NRF_SUCCESS)
+    {
+        NRF_LOG_INFO("Reading threshold regiseter is failed");
+        return;
+    }
+    if(p_reg_data->reg_addr==TCS34725_REG_THRESHOLD_LOW_L)
+    {
+        NRF_LOG_INFO("Threshold Low value : %d",p_reg_data->threshold_data);
+    }
+    else
+    {
+        NRF_LOG_INFO("Threshold High value : %d",p_reg_data->threshold_data);
+    }
+}
 
 /**@brief Application main function.
  */
-static void mlx_rd_temp_thread(void *arg)
-{
-    mlx90614_reg_data_t obj_1_temp_struct={0,0,MLX90614_REG_OBJECT_1_TEMP};
-
-    UBaseType_t uxHighWaterMark;
-    uxHighWaterMark=uxTaskGetStackHighWaterMark(NULL);
-
-    while(1)
-    {
-        mlx90614_reg_read(&mlx90614_instance,&obj_1_temp_struct,mlx90614_read_temp_cb);
-        vTaskDelay(1000);
-        uxHighWaterMark=uxTaskGetStackHighWaterMark(NULL);
-//        printf("mlx_rd_temp_thread remaining stack space : %d\r\n",uxHighWaterMark);
-    }
-}
-
-static void mlx_rd_emi_thread(void *arg)
-{
-    configSTACK_DEPTH_TYPE uxHighWaterMark2;
-    uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
-
-    mlx90614_reg_data_t emissivity_struct={0,0,MLX90614_REG_EMISSIVITY_1};
-
-    while(1)
-    { 
-        mlx90614_reg_read(&mlx90614_instance, &emissivity_struct, mlx90614_read_emissivity_cb);
-        vTaskDelete(m_mlx_rd_emi_thread);
-    }
-}
-
 static void led_toggle_thread(void * pvParameter)
 {
     configSTACK_DEPTH_TYPE uxHighWaterMark2;
@@ -1009,12 +967,21 @@ static void led_toggle_thread(void * pvParameter)
     }
 }
 
-static void ble_mlx_temp_thread(void *arg)
+static void tcs_read_rgbc_thread(void *arg)
+{
+    while(1)
+    {
+        tcs34725_read_rgbc(&tcs34725_instance,&tcs34725_rgbc_str,tcs34725_rgbc_cb);
+        vTaskDelay(5000);
+    }
+}
+
+static void ble_tcs_rgbc_send_thread(void *arg)
 {
     ret_code_t err_code;
-    char data_array[6]={NULL};
-    double temperature;
-    uint16_t temp;
+    char data_array[5+(3*4)]={NULL};
+//    uint32_t *rgbc_addr=0;
+    tcs34725_rgbc_data_t *rgbc_str;
     uint16_t length=sizeof(data_array);
 
     configSTACK_DEPTH_TYPE uxHighWaterMark2;
@@ -1022,13 +989,12 @@ static void ble_mlx_temp_thread(void *arg)
 
     while(1)
     {
-        if((temp=ulTaskNotifyTake(pdTRUE,10))!=0)
+        if(ulTaskNotifyTake(pdTRUE,10)!=0)
         {
-            temperature=mlx90614_temp_conversion(temp);
-            sprintf(data_array,"%3.2f",temperature);
-//            printf("%s\r\n",data_array);
-//
-            if((m_conn_handle!=BLE_CONN_HANDLE_INVALID)&&(temperature!= -273.15))
+
+            sprintf(data_array,"%5d%3d%3d%3d",tcs34725_rgbc_str.clear,tcs34725_rgbc_str.red,tcs34725_rgbc_str.green,
+                    tcs34725_rgbc_str.blue);
+            if(m_conn_handle!=BLE_CONN_HANDLE_INVALID)
             {
                 err_code=ble_nus_data_send(&m_nus, data_array, &length, m_conn_handle);
                 if ((err_code != NRF_ERROR_INVALID_STATE) &&
@@ -1044,44 +1010,6 @@ static void ble_mlx_temp_thread(void *arg)
     }
 }
 
-static void ble_mlx_emi_thread(void *arg)
-{
-    ret_code_t err_code;
-    static char data_array[4]={NULL};
-    static float emissivity;
-    static uint16_t temp;
-    static uint16_t length=sizeof(data_array);
-    
-    configSTACK_DEPTH_TYPE uxHighWaterMark2;
-    uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
-
-    while(1)
-    {
-        if((temp=ulTaskNotifyTake(pdTRUE,(TickType_t)10))!=0)
-        {
-            printf("ble emi\r\n");
-            printf("%d %.2f\r\n",temp,mlx90614_emissivity_conversion(temp));
-            emissivity=mlx90614_emissivity_conversion(temp);
-            sprintf(data_array,"%.2f",emissivity);
-            printf("%s\r\n",data_array);
-
-            if((m_conn_handle!=BLE_CONN_HANDLE_INVALID))
-            {
-                err_code=ble_nus_data_send(&m_nus, data_array, &length, m_conn_handle);
-                if ((err_code != NRF_ERROR_INVALID_STATE) &&
-                    (err_code != NRF_ERROR_RESOURCES) &&
-                    (err_code != NRF_ERROR_NOT_FOUND))
-                {
-                    APP_ERROR_CHECK(err_code);
-                }
-            }
-            vTaskDelete(m_ble_mlx_emi_thread);
-            uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
-            printf("ble emi : %d\r\n",uxHighWaterMark2);
-        }
-        
-    }
-}
 
 /**@brief A function which is hooked to idle task.
  * @note Idle hook must be enabled in FreeRTOS configuration (configUSE_IDLE_HOOK).
@@ -1117,27 +1045,67 @@ static void logger_thread(void * arg)
 
 static void task_create_func(void)
 {
-    if (pdPASS != xTaskCreate(mlx_rd_temp_thread, "MLX90614_RD_TEMP", configMINIMAL_STACK_SIZE+30, NULL, 2, &m_mlx_rd_temp_thread))
+    
+    if(pdPASS!=xTaskCreate(tcs_read_rgbc_thread, "TCS_RGBC_READ", configMINIMAL_STACK_SIZE+60, 
+                           NULL, 3, &m_tcs_read_rgbc_thread))
     {
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
     }
 
-    if (pdPASS!=xTaskCreate(led_toggle_thread, "LED0", configMINIMAL_STACK_SIZE + 10, NULL, 2, &m_led_toggle_thread))
+    if(pdPASS!=xTaskCreate(ble_tcs_rgbc_send_thread, "TCS_RGBC_BLE_SEND", configMINIMAL_STACK_SIZE+60, 
+                           NULL, 3, &m_ble_tcs_rgbc_send_thread))
     {
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
     }
-
-    if (pdPASS != xTaskCreate(ble_mlx_temp_thread, "BLE_UART", configMINIMAL_STACK_SIZE+30, NULL, 2, &m_ble_mlx_temp_thread))
-    {
-        APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
-    }
-
 #if NRF_LOG_ENABLED
     if (pdPASS!=xTaskCreate(logger_thread, "LOGGER", 256, NULL, 1, &m_logger_thread))
     {
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
     }
 #endif
+}
+
+
+void tcs34725_start()
+{
+    ret_code_t err_code;
+
+    err_code=tcs34725_init(&tcs34725_instance);
+    APP_ERROR_CHECK(err_code);
+
+    err_code=tcs34725_set_timing(&tcs34725_instance, 150);  //1~256
+    APP_ERROR_CHECK(err_code);
+
+    err_code=tcs34725_set_wait_time(&tcs34725_instance, 255);   //1~256
+    APP_ERROR_CHECK(err_code);
+
+    err_code=tcs34725_set_persistence(&tcs34725_instance, TCS34725_OUT_OF_RANGE_3);
+    APP_ERROR_CHECK(err_code);
+
+    err_code=tcs34725_set_gain(&tcs34725_instance, TCS34725_GAIN_x60);
+    APP_ERROR_CHECK(err_code);
+
+//    err_code=tcs34725_set_wait_long(&tcs34725_instance, TCS34725_WAIT_LONG_ENABLE);
+//    APP_ERROR_CHECK(err_code);
+
+    err_code=tcs34725_set_threshold(&tcs34725_instance, TCS34725_THRESHOLD_LOW, 10000);
+    APP_ERROR_CHECK(err_code);
+
+    err_code=tcs34725_set_threshold(&tcs34725_instance, TCS34725_THRESHOLD_HIGH, 65535);
+    APP_ERROR_CHECK(err_code);
+}
+
+void tcs34725_read_config()
+{
+    ret_code_t err_code;
+
+    tcs34725_read_all_config(&tcs34725_instance, tcs34725_read_reg_cb);
+
+    err_code=tcs34725_read_threshold(&tcs34725_instance, TCS34725_THRESHOLD_LOW, tcs34725_read_thr_cb);
+    APP_ERROR_CHECK(err_code);
+    nrf_delay_ms(10);
+    err_code=tcs34725_read_threshold(&tcs34725_instance, TCS34725_THRESHOLD_HIGH, tcs34725_read_thr_cb);
+    APP_ERROR_CHECK(err_code);
 }
 
 int main(void)
@@ -1162,8 +1130,9 @@ int main(void)
     twi_config();
     err_code=nrf_twi_sensor_init(&sensor_instance);
     APP_ERROR_CHECK(err_code);
-    err_code=mlx90614_init(&mlx90614_instance);
-    APP_ERROR_CHECK(err_code);
+
+    tcs34725_start();
+    tcs34725_read_config();
 
     // Start execution.
     printf("\r\nUART started.\r\n");
