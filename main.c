@@ -175,6 +175,10 @@ tcs34725_rgbc_data_t tcs34725_rgbc_str;
 static TaskHandle_t m_led_toggle_thread;
 static TaskHandle_t m_tcs_read_rgbc_thread;
 static TaskHandle_t m_ble_tcs_rgbc_send_thread;
+static TaskHandle_t m_ble_tcs_reg_send_thread;
+static QueueHandle_t m_tcs_reg_data_queue;
+
+void tcs34725_cmd_func(char *str_cmd, char *str_data);
 
 #if NRF_LOG_ENABLED
 static TaskHandle_t m_logger_thread;                                /**< Definition of Logger thread. */
@@ -271,9 +275,6 @@ static void nrf_qwr_error_handler(uint32_t nrf_error)
 }
 
 
-
-void mlx90614_cmd_func(char *str_cmd, char *str_data);
-
 /**@brief Function for handling the data from the Nordic UART Service.
  *
  * @details This function will process the data received from the Nordic UART BLE Service and send
@@ -321,13 +322,10 @@ static void nus_data_handler(ble_nus_evt_t * p_evt)
     if(strcmp(str_cmd,"000")!=0)
     {
         printf("mode select\r\n");
-//        mlx90614_cmd_func(str_cmd, str_data);
+        tcs34725_cmd_func(str_cmd, str_data);
     }
 }
 /**@snippet [Handling the data received over BLE] */
-
-
-
 
 
 /**@brief Function for initializing services that will be used by the application.
@@ -873,8 +871,15 @@ static void twi_config(void)
 
 /*@Callback
  */
+
+typedef struct{
+    char send_data[7];
+}tcs34725_ble_send_t;
+
 void tcs34725_read_reg_cb(ret_code_t result, tcs34725_reg_data_t * p_raw_data)
 {
+    char read_reg_cb_cmd[]="CMD", read_reg_cb_val[]="VAL", *read_reg_cb_data="CMDVAL";
+
     if(result!=NRF_SUCCESS)
     {
         NRF_LOG_INFO("TCS34725 register read fail");
@@ -886,31 +891,50 @@ void tcs34725_read_reg_cb(ret_code_t result, tcs34725_reg_data_t * p_raw_data)
     {
         case TCS34725_REG_ENABLE :
             NRF_LOG_INFO("Enable register : %X",p_raw_data->reg_data);
+            strcpy(read_reg_cb_cmd,"ENA");
             break;
         case TCS34725_REG_TIMING :
             NRF_LOG_INFO("Timing register : %X",p_raw_data->reg_data);
+            strcpy(read_reg_cb_cmd,"TIM");
+            p_raw_data->reg_data=256-p_raw_data->reg_data;
             break;
         case TCS34725_REG_WAIT_TIME :
             NRF_LOG_INFO("Wait time register : %X",p_raw_data->reg_data);
+            strcpy(read_reg_cb_cmd,"WAT");
             break;
         case TCS34725_REG_PERSISTENCE :
             NRF_LOG_INFO("Persistence register : %X",p_raw_data->reg_data);
+            strcpy(read_reg_cb_cmd,"PER");
             break;
         case TCS34725_REG_CONFIG :
             NRF_LOG_INFO("Configuration register : %X",p_raw_data->reg_data);
+            strcpy(read_reg_cb_cmd,"WLO");
             break;
         case TCS34725_REG_CONTROL :
             NRF_LOG_INFO("Control register : %X",p_raw_data->reg_data);
+            strcpy(read_reg_cb_cmd,"GIN");
             break;
         case TCS34725_REG_ID :
             NRF_LOG_INFO("ID register : %X",p_raw_data->reg_data);
+            strcpy(read_reg_cb_cmd,"IDR");
             break;
         case TCS34725_REG_STATUS :
             NRF_LOG_INFO("Status register : %X",p_raw_data->reg_data);
+            strcpy(read_reg_cb_cmd,"STA");
             break;
         default :
             break;
     }
+
+    tcs34725_ble_send_t tcs_ble_send_str;
+    sprintf(tcs_ble_send_str.send_data,"%s%3d",read_reg_cb_cmd,p_raw_data->reg_data);
+    printf("read rgb cb : %s   %d\r\n",tcs_ble_send_str.send_data,p_raw_data->reg_data);
+
+    if(pdTRUE!=xQueueSend(m_tcs_reg_data_queue, &tcs_ble_send_str, 10))
+    {
+        printf("xQueue send fail\r\n");
+    }
+    xTaskNotifyGive(m_ble_tcs_reg_send_thread);
 }
 
 void tcs34725_rgbc_cb(ret_code_t result, tcs34725_rgbc_data_t * p_raw_data)
@@ -952,6 +976,45 @@ void tcs34725_read_thr_cb(ret_code_t result, tcs34725_threshold_data_t * p_reg_d
 
 /**@brief Application main function.
  */
+int chartoint(char *char_value)
+{
+    uint8_t int_val=0;
+    
+    for(int i=2;0<=i;i--)
+    {
+        int_val+=((int)*char_value-48)*(pow(10,i));
+        char_value++;
+    }
+    return int_val;
+}
+
+void tcs34725_cmd_func(char *str_cmd, char *str_data)
+{
+    tcs34725_reg_data_t tcs_cmd_str;
+    ret_code_t err_code;
+
+    if(strcmp(str_cmd,"TIM")==0)
+    {
+        NRF_LOG_INFO("Set Timming");
+        err_code=tcs34725_set_timing(&tcs34725_instance,chartoint(str_data));
+        if(err_code!=NRF_SUCCESS)
+        {
+            NRF_LOG_INFO("Set wait time fail");
+            return;
+        }
+        tcs_cmd_str.reg_addr=TCS34725_REG_TIMING;
+        err_code=tcs34725_read_reg(&tcs34725_instance,&tcs_cmd_str,tcs34725_read_reg_cb);
+        if(err_code!=NRF_SUCCESS)
+        {
+            NRF_LOG_INFO("Read wait time fail");
+            return;
+        }
+    }
+    else
+    {
+    }
+}
+
 static void led_toggle_thread(void * pvParameter)
 {
     configSTACK_DEPTH_TYPE uxHighWaterMark2;
@@ -1010,6 +1073,39 @@ static void ble_tcs_rgbc_send_thread(void *arg)
     }
 }
 
+static void ble_tcs_reg_send_thread(void *arg)
+{
+    ret_code_t err_code;
+    tcs34725_ble_send_t ble_tcs_send_reg;
+    uint16_t length=sizeof(ble_tcs_send_reg);
+
+//    configSTACK_DEPTH_TYPE uxHighWaterMark2;
+//    uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
+
+    while(1)
+    {
+        if(ulTaskNotifyTake(pdTRUE,10)!=0)
+        {
+            if(pdPASS!=xQueueReceive(m_tcs_reg_data_queue, &ble_tcs_send_reg, 10))
+            {
+                //fail
+            }
+
+            if(m_conn_handle!=BLE_CONN_HANDLE_INVALID)
+            {
+                err_code=ble_nus_data_send(&m_nus, ble_tcs_send_reg.send_data, &length, m_conn_handle);
+                if ((err_code != NRF_ERROR_INVALID_STATE) &&
+                    (err_code != NRF_ERROR_RESOURCES) &&
+                    (err_code != NRF_ERROR_NOT_FOUND))
+                {
+                    APP_ERROR_CHECK(err_code);
+                }
+            }
+//            uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
+//            printf("BLE UART : %d\r\n",uxHighWaterMark2);
+        }
+    }
+}
 
 /**@brief A function which is hooked to idle task.
  * @note Idle hook must be enabled in FreeRTOS configuration (configUSE_IDLE_HOOK).
@@ -1046,14 +1142,20 @@ static void logger_thread(void * arg)
 static void task_create_func(void)
 {
     
-    if(pdPASS!=xTaskCreate(tcs_read_rgbc_thread, "TCS_RGBC_READ", configMINIMAL_STACK_SIZE+60, 
+    if(pdPASS!=xTaskCreate(tcs_read_rgbc_thread, "TCS_RGBC_READ", configMINIMAL_STACK_SIZE+30, 
                            NULL, 3, &m_tcs_read_rgbc_thread))
     {
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
     }
 
-    if(pdPASS!=xTaskCreate(ble_tcs_rgbc_send_thread, "TCS_RGBC_BLE_SEND", configMINIMAL_STACK_SIZE+60, 
+    if(pdPASS!=xTaskCreate(ble_tcs_rgbc_send_thread, "TCS_RGBC_BLE_SEND", configMINIMAL_STACK_SIZE+30, 
                            NULL, 3, &m_ble_tcs_rgbc_send_thread))
+    {
+        APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
+    }
+
+    if(pdPASS!=xTaskCreate(ble_tcs_reg_send_thread, "TCS_REG_BLE_SEND", configMINIMAL_STACK_SIZE+30,
+                           NULL, 3, &m_ble_tcs_reg_send_thread))
     {
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
     }
@@ -1065,6 +1167,10 @@ static void task_create_func(void)
 #endif
 }
 
+static void queue_create_func(void)
+{
+    m_tcs_reg_data_queue=xQueueCreate(8,sizeof(tcs34725_ble_send_t));
+}
 
 void tcs34725_start()
 {
@@ -1131,6 +1237,9 @@ int main(void)
     err_code=nrf_twi_sensor_init(&sensor_instance);
     APP_ERROR_CHECK(err_code);
 
+    queue_create_func();
+    task_create_func();
+    
     tcs34725_start();
     tcs34725_read_config();
 
@@ -1139,7 +1248,8 @@ int main(void)
     NRF_LOG_INFO("Debug logging for UART over RTT started.");
     NRF_LOG_FLUSH();
     
-    task_create_func();
+    
+    
 
     nrf_sdh_freertos_init(advertising_start,&erase_bonds);
     vTaskStartScheduler();
