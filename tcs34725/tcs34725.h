@@ -145,6 +145,9 @@ ret_code_t tcs34725_set_wait_time(tcs34725_instance_t const * p_instance,
 ret_code_t tcs34725_set_persistence(tcs34725_instance_t const * p_instance,
                                     tcs34725_persistence_t out_of_range_val);
                                     
+ret_code_t tcs34725_set_enable(tcs34725_instance_t const * p_instance,
+                               tcs34725_wait_long_t enable_reg_val);
+
 ret_code_t tcs34725_set_wait_long(tcs34725_instance_t const * p_instance,
                                    tcs34725_wait_long_t wait_long_val);
 
