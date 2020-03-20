@@ -896,8 +896,9 @@ void tcs34725_read_reg_cb(ret_code_t result, tcs34725_reg_data_t * p_raw_data)
         NRF_LOG_INFO("TCS34725 register read fail");
         return;
     }
+    printf("addr : %x\r\n",p_raw_data->reg_addr);
     p_raw_data->reg_addr&=0x1F;
-
+    
     switch(p_raw_data->reg_addr)
     {
         case TCS34725_REG_ENABLE :
@@ -940,9 +941,10 @@ void tcs34725_read_reg_cb(ret_code_t result, tcs34725_reg_data_t * p_raw_data)
 
     tcs34725_ble_reg_t tcs_ble_send_str;
     sprintf(tcs_ble_send_str.send_data,"%s%3d",read_reg_cb_cmd,p_raw_data->reg_data);
+    printf("read : %x\r\n",p_raw_data->reg_addr);
     printf("read rgb cb : %s\r\n",tcs_ble_send_str.send_data);
 
-    if(pdTRUE!=xQueueSendToFront(m_tcs_reg_data_queue, &tcs_ble_send_str, 10))
+    if(pdTRUE!=xQueueSend(m_tcs_reg_data_queue, &tcs_ble_send_str, 10))
     {
         printf("xQueue send fail\r\n");
     }
@@ -1053,7 +1055,7 @@ static void tcs_read_all_reg_thread(void *arg)
 
 void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
 {
-    tcs34725_reg_data_t tcs_cmd_str;
+    static tcs34725_reg_data_t tcs_cmd_str;
     ret_code_t err_code;
 
     printf("cmd func : %s %s\r\n",cmd_func_str->cmd,cmd_func_str->data);
@@ -1155,30 +1157,11 @@ void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
     }
 }
 
-uint8_t tcs_cmd_find(char *cmd_data)
-{
-    if(strcmp(cmd_data,"ENA")==0)
-    {
-        return TCS34725_REG_ENABLE;
-    }
-    else if(strcmp(cmd_data,"TIM")==0)
-    {
-        return TCS34725_REG_TIMING;
-    }
-    else if(strcmp(cmd_data,"WAT")==0)
-    {
-        return TCS34725_REG_WAIT_TIME;
-    }
-    else
-    {
-    }
-
-}
 
 static void tcs_wr_reg_thread(void *arg)
 {
-    configSTACK_DEPTH_TYPE uxHighWaterMark2;
-    uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
+//    configSTACK_DEPTH_TYPE uxHighWaterMark2;
+//    uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
 
     ret_code_t err_code;
     tcs34725_cmd_t wr_cmd_str;
@@ -1193,8 +1176,8 @@ static void tcs_wr_reg_thread(void *arg)
         }
 
         vTaskDelay(1000);
-        uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
-        printf("TCS WR STACK SIZE LEFT : %d\r\n",uxHighWaterMark2);
+//        uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
+//        printf("TCS WR STACK SIZE LEFT : %d\r\n",uxHighWaterMark2);
     }
 }
 
