@@ -187,11 +187,10 @@ void tcs34725_rgbc_print(tcs34725_rgbc_data_t * color_str)
     c_green=(int)((double)color_str->green/color_str->clear*255);
     c_blue=(int)((double)color_str->blue/color_str->clear*255);
 
-
-    NRF_LOG_INFO("Clear : %d",color_str->clear);
-    NRF_LOG_INFO("Red   : %d",c_red);
-    NRF_LOG_INFO("Green : %d",c_green);
-    NRF_LOG_INFO("Blue  : %d",c_blue);
+//    NRF_LOG_INFO("Clear : %d",color_str->clear);
+//    NRF_LOG_INFO("Red   : %d",c_red);
+//    NRF_LOG_INFO("Green : %d",c_green);
+//    NRF_LOG_INFO("Blue  : %d",c_blue);
 }
 
 ret_code_t tcs34725_set_threshold(tcs34725_instance_t const * p_instance,
