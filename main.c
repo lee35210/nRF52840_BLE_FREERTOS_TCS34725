@@ -184,7 +184,7 @@ static QueueHandle_t m_tcs_rgb_data_queue;
 static QueueHandle_t m_tcs_cmd_queue;
 
 typedef struct{
-    char cmd[4],data[4];
+    char cmd[4],data[6];
 }tcs34725_cmd_t;
 
 void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str);
@@ -322,17 +322,19 @@ static void nus_data_handler(ble_nus_evt_t * p_evt)
 
         memcpy(nus_cmd_str.cmd,p_evt->params.rx_data.p_data,3);
 
-        if(3<p_evt->params.rx_data.length)
+        if((4<p_evt->params.rx_data.length)&&(p_evt->params.rx_data.length<8))
         {
             memcpy(nus_cmd_str.data,&p_evt->params.rx_data.p_data[3],3);
+        }
+        else if(7<p_evt->params.rx_data.length)
+        {
+            memcpy(nus_cmd_str.data,&p_evt->params.rx_data.p_data[3],5);
         }
         if(pdPASS!=xQueueSend(m_tcs_cmd_queue,&nus_cmd_str,10))
         {
             NRF_LOG_INFO("NUS DATA HANLDER : QUEUE SEND FAIL");
         }
         xTaskNotifyGive(m_tcs_wr_reg_thread);
-        printf("nus 1 : %s\r\n",nus_cmd_str.cmd);
-        printf("nus 2 : %s\r\n",nus_cmd_str.data);
     }
 
 }
@@ -896,7 +898,6 @@ void tcs34725_read_reg_cb(ret_code_t result, tcs34725_reg_data_t * p_raw_data)
         NRF_LOG_INFO("TCS34725 register read fail");
         return;
     }
-    printf("addr : %x\r\n",p_raw_data->reg_addr);
     p_raw_data->reg_addr&=0x1F;
     
     switch(p_raw_data->reg_addr)
@@ -1044,7 +1045,6 @@ static void tcs_read_all_reg_thread(void *arg)
         status.reg_addr=TCS34725_REG_STATUS;
         tcs34725_read_reg(&tcs34725_instance, &status, tcs34725_read_reg_cb);
         vTaskDelay(10);
-
         
         vTaskDelete(m_tcs_reg_all_send_thread);
     }
