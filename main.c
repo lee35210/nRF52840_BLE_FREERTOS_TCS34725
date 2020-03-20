@@ -1156,10 +1156,19 @@ void tcs34725_cmd_func(char *str_cmd, char *str_data)
 
 static void tcs_wr_reg_thread(void *arg)
 {
+    tcs34725_cmd_t wr_cmd_str;
     while(1)
     {
-        if(ulTaskNotifyTake(pdTRUE,10)!=0)
+        if((ulTaskNotifyTake(pdTRUE,10)!=0)&&(pdPASS==xQueueReceive(m_tcs_cmd_queue,&wr_cmd_str,10)))
         {
+            if(strcmp(wr_cmd_str.cmd,"RAR")==0)
+            {
+                if(pdPASS!=xTaskCreate(tcs_read_all_reg_thread, "TCS_READ_ALL_REG", configMINIMAL_STACK_SIZE+30,
+                               NULL, 3, &m_tcs_reg_all_send_thread))
+                {
+                    APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
+                }
+            }
         }
         vTaskDelay(1000);
     }
