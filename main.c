@@ -184,7 +184,7 @@ static QueueHandle_t m_tcs_rgb_data_queue;
 static QueueHandle_t m_tcs_cmd_queue;
 
 typedef struct{
-    char cmd[3],data[3];
+    char cmd[4],data[4];
 }tcs34725_cmd_t;
 
 void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str);
@@ -297,7 +297,7 @@ static void nus_data_handler(ble_nus_evt_t * p_evt)
     if (p_evt->type == BLE_NUS_EVT_RX_DATA)
     {
         uint32_t err_code;
-        tcs34725_cmd_t nus_cmd_str;
+        tcs34725_cmd_t nus_cmd_str={0};
 
         NRF_LOG_DEBUG("Received data from BLE NUS. Writing data on UART.");
         NRF_LOG_HEXDUMP_DEBUG(p_evt->params.rx_data.p_data, p_evt->params.rx_data.length);
@@ -324,13 +324,15 @@ static void nus_data_handler(ble_nus_evt_t * p_evt)
 
         if(3<p_evt->params.rx_data.length)
         {
-            memcpy(nus_cmd_str.cmd,&p_evt->params.rx_data.p_data[3],3);
+            memcpy(nus_cmd_str.data,&p_evt->params.rx_data.p_data[3],3);
         }
         if(pdPASS!=xQueueSend(m_tcs_cmd_queue,&nus_cmd_str,10))
         {
             NRF_LOG_INFO("NUS DATA HANLDER : QUEUE SEND FAIL");
         }
         xTaskNotifyGive(m_tcs_wr_reg_thread);
+        printf("nus 1 : %s\r\n",nus_cmd_str.cmd);
+        printf("nus 2 : %s\r\n",nus_cmd_str.data);
     }
 
 }
@@ -940,9 +942,7 @@ void tcs34725_read_reg_cb(ret_code_t result, tcs34725_reg_data_t * p_raw_data)
     sprintf(tcs_ble_send_str.send_data,"%s%3d",read_reg_cb_cmd,p_raw_data->reg_data);
     printf("read rgb cb : %s\r\n",tcs_ble_send_str.send_data);
 
-
     if(pdTRUE!=xQueueSendToFront(m_tcs_reg_data_queue, &tcs_ble_send_str, 10))
-//    if(pdTRUE!=xQueueOverwrite(m_tcs_reg_data_queue, &tcs_ble_send_str))
     {
         printf("xQueue send fail\r\n");
     }
@@ -958,7 +958,7 @@ void tcs34725_rgbc_cb(ret_code_t result, tcs34725_rgbc_data_t * p_raw_data)
         NRF_LOG_INFO("tcs rgbc callback failed");
         return;
     }
-    tcs34725_rgbc_print(p_raw_data);
+//    tcs34725_rgbc_print(p_raw_data);
 
     tcs_rgbc_cb_str.clear=p_raw_data->clear;
     tcs_rgbc_cb_str.red=(int)((double)p_raw_data->red/p_raw_data->clear*255);
@@ -1056,6 +1056,7 @@ void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
     tcs34725_reg_data_t tcs_cmd_str;
     ret_code_t err_code;
 
+    printf("cmd func : %s %s\r\n",cmd_func_str->cmd,cmd_func_str->data);
     if(strcmp(cmd_func_str->cmd,"RAR")==0)
     {
         if(pdPASS!=xTaskCreate(tcs_read_all_reg_thread, "TCS_READ_ALL_REG", configMINIMAL_STACK_SIZE+30,
@@ -1187,20 +1188,7 @@ static void tcs_wr_reg_thread(void *arg)
     {
         if((ulTaskNotifyTake(pdTRUE,10)!=0)&&(pdPASS==xQueueReceive(m_tcs_cmd_queue,&wr_cmd_str,10)))
         {
-//            if(strcmp(wr_cmd_str.cmd,"RAR")==0)
-//            {
-//                if(pdPASS!=xTaskCreate(tcs_read_all_reg_thread, "TCS_READ_ALL_REG", configMINIMAL_STACK_SIZE+30,
-//                               NULL, 3, &m_tcs_reg_all_send_thread))
-//                {
-//                    APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
-//                }
-//            }
-//            else
-//            {
-//                wr_reg_str.reg_addr=tcs_cmd_find(wr_cmd_str.cmd);
-//
-//                printf("wr reg : %X\r\n",wr_reg_str.reg_addr);
-//            }
+            printf("wr reg : %s\r\n",wr_cmd_str.cmd);
             tcs34725_cmd_func(&wr_cmd_str);
         }
 
@@ -1347,7 +1335,7 @@ static void task_create_func(void)
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
     }
 
-    if(pdPASS!=xTaskCreate(tcs_wr_reg_thread, "TCS_WR_REG", configMINIMAL_STACK_SIZE+30, 
+    if(pdPASS!=xTaskCreate(tcs_wr_reg_thread, "TCS_WR_REG", configMINIMAL_STACK_SIZE+100, 
                            NULL, 3, &m_tcs_wr_reg_thread))
     {
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
@@ -1363,12 +1351,12 @@ static void task_create_func(void)
     {
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
     }
-#if NRF_LOG_ENABLED
-    if (pdPASS!=xTaskCreate(logger_thread, "LOGGER", configMINIMAL_STACK_SIZE+60, NULL, 1, &m_logger_thread))
-    {
-        APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
-    }
-#endif
+//#if NRF_LOG_ENABLED
+//    if (pdPASS!=xTaskCreate(logger_thread, "LOGGER", configMINIMAL_STACK_SIZE+60, NULL, 1, &m_logger_thread))
+//    {
+//        APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
+//    }
+//#endif
 }
 
 static void queue_create_func(void)
