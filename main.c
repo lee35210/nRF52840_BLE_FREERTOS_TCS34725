@@ -187,7 +187,7 @@ typedef struct{
     char cmd[3],data[3];
 }tcs34725_cmd_t;
 
-void tcs34725_cmd_func(char *str_cmd, char *str_data);
+void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str);
 
 #if NRF_LOG_ENABLED
 static TaskHandle_t m_logger_thread;                                /**< Definition of Logger thread. */
@@ -1051,12 +1051,12 @@ static void tcs_read_all_reg_thread(void *arg)
     }
 }
 
-void tcs34725_cmd_func(char *str_cmd, char *str_data)
+void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
 {
     tcs34725_reg_data_t tcs_cmd_str;
     ret_code_t err_code;
 
-    if(strcmp(str_cmd,"RAR")==0)
+    if(strcmp(cmd_func_str->cmd,"RAR")==0)
     {
         if(pdPASS!=xTaskCreate(tcs_read_all_reg_thread, "TCS_READ_ALL_REG", configMINIMAL_STACK_SIZE+30,
                        NULL, 3, &m_tcs_reg_all_send_thread))
@@ -1064,10 +1064,10 @@ void tcs34725_cmd_func(char *str_cmd, char *str_data)
             APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
         }
     }
-    else if(strcmp(str_cmd,"TIM")==0)
+    else if(strcmp(cmd_func_str->cmd,"TIM")==0)
     {
         NRF_LOG_INFO("Set Timming");
-        err_code=tcs34725_set_timing(&tcs34725_instance,chartoint(str_data));
+        err_code=tcs34725_set_timing(&tcs34725_instance,chartoint(cmd_func_str->data));
         if(err_code!=NRF_SUCCESS)
         {
             NRF_LOG_INFO("Set timing fail");
@@ -1081,10 +1081,10 @@ void tcs34725_cmd_func(char *str_cmd, char *str_data)
             return;
         }
     }
-    else if(strcmp(str_cmd,"WAT")==0)
+    else if(strcmp(cmd_func_str->cmd,"WAT")==0)
     {
         NRF_LOG_INFO("Set Wait Time");
-        err_code=tcs34725_set_wait_time(&tcs34725_instance,chartoint(str_data));
+        err_code=tcs34725_set_wait_time(&tcs34725_instance,chartoint(cmd_func_str->data));
         if(err_code!=NRF_SUCCESS)
         {
             NRF_LOG_INFO("Set wait time fail");
@@ -1098,10 +1098,10 @@ void tcs34725_cmd_func(char *str_cmd, char *str_data)
             return;
         }
     }
-    else if(strcmp(str_cmd,"GIN")==0)
+    else if(strcmp(cmd_func_str->cmd,"GIN")==0)
     {
         NRF_LOG_INFO("Set gain");
-        err_code=tcs34725_set_gain(&tcs34725_instance,chartoint(str_data));
+        err_code=tcs34725_set_gain(&tcs34725_instance,chartoint(cmd_func_str->data));
         if(err_code!=NRF_SUCCESS)
         {
             NRF_LOG_INFO("Set gain fail");
@@ -1115,10 +1115,10 @@ void tcs34725_cmd_func(char *str_cmd, char *str_data)
             return;
         }
     }
-    else if(strcmp(str_cmd,"ENA")==0)
+    else if(strcmp(cmd_func_str->cmd,"ENA")==0)
     {
         NRF_LOG_INFO("Set interrupt");
-        err_code=tcs34725_set_interrupt(&tcs34725_instance,chartoint(str_data));
+        err_code=tcs34725_set_interrupt(&tcs34725_instance,chartoint(cmd_func_str->data));
         if(err_code!=NRF_SUCCESS)
         {
             NRF_LOG_INFO("Set interrupt fail");
@@ -1132,10 +1132,10 @@ void tcs34725_cmd_func(char *str_cmd, char *str_data)
             return;
         }
     }
-    else if(strcmp(str_cmd,"WLO")==0)
+    else if(strcmp(cmd_func_str->cmd,"WLO")==0)
     {
         NRF_LOG_INFO("Set wait long");
-        err_code=tcs34725_set_wait_long(&tcs34725_instance,chartoint(str_data));
+        err_code=tcs34725_set_wait_long(&tcs34725_instance,chartoint(cmd_func_str->data));
         if(err_code!=NRF_SUCCESS)
         {
             NRF_LOG_INFO("Set wait long fail");
@@ -1187,21 +1187,21 @@ static void tcs_wr_reg_thread(void *arg)
     {
         if((ulTaskNotifyTake(pdTRUE,10)!=0)&&(pdPASS==xQueueReceive(m_tcs_cmd_queue,&wr_cmd_str,10)))
         {
-            if(strcmp(wr_cmd_str.cmd,"RAR")==0)
-            {
-                if(pdPASS!=xTaskCreate(tcs_read_all_reg_thread, "TCS_READ_ALL_REG", configMINIMAL_STACK_SIZE+30,
-                               NULL, 3, &m_tcs_reg_all_send_thread))
-                {
-                    APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
-                }
-            }
-            else
-            {
-                wr_reg_str.reg_addr=tcs_cmd_find(wr_cmd_str.cmd);
-
-                printf("wr reg : %X\r\n",wr_reg_str.reg_addr);
-            }
-            tcs_cmd_func(&wr_cmd_str);
+//            if(strcmp(wr_cmd_str.cmd,"RAR")==0)
+//            {
+//                if(pdPASS!=xTaskCreate(tcs_read_all_reg_thread, "TCS_READ_ALL_REG", configMINIMAL_STACK_SIZE+30,
+//                               NULL, 3, &m_tcs_reg_all_send_thread))
+//                {
+//                    APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
+//                }
+//            }
+//            else
+//            {
+//                wr_reg_str.reg_addr=tcs_cmd_find(wr_cmd_str.cmd);
+//
+//                printf("wr reg : %X\r\n",wr_reg_str.reg_addr);
+//            }
+            tcs34725_cmd_func(&wr_cmd_str);
         }
 
         vTaskDelay(1000);
