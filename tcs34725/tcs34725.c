@@ -128,13 +128,24 @@ ret_code_t tcs34725_set_persistence(tcs34725_instance_t const * p_instance,
     return err_code;
 }
 
+ret_code_t tcs34725_set_enable(tcs34725_instance_t const * p_instance,
+                               tcs34725_wait_long_t enable_reg_val)
+{
+    ret_code_t err_code;
+    tcs34725_reg_data_t enable_reg;
+    enable_reg.reg_addr=TCS34725_REG_ENABLE;
+    enable_reg.reg_data=enable_reg_val;
+    err_code=tcs34725_write_reg(p_instance, &enable_reg);
+    return err_code;
+}
+
 ret_code_t tcs34725_set_wait_long(tcs34725_instance_t const * p_instance,
-                                   tcs34725_wait_long_t wait_long_val)
+                                  tcs34725_wait_long_t wait_long_val)
 {
     ret_code_t err_code;
     tcs34725_reg_data_t wait_long;
-    wait_long.reg_addr=TCS34725_REG_WAIT_TIME;
-    wait_long.reg_data=wait_long_val << TCS34725_WAIT_LONG_POS;
+    wait_long.reg_addr=TCS34725_REG_CONFIG;
+    wait_long.reg_data=(wait_long_val<<TCS34725_WAIT_LONG_POS);
     err_code=tcs34725_write_reg(p_instance, &wait_long);
     return err_code;
 }
