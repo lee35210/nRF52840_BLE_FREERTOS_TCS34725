@@ -882,7 +882,7 @@ typedef struct{
 
 void tcs34725_read_reg_cb(ret_code_t result, tcs34725_reg_data_t * p_raw_data)
 {
-    char read_reg_cb_cmd[]="CMD", read_reg_cb_val[]="VAL", *read_reg_cb_data="CMDVAL";
+    char read_reg_cb_cmd[]="CMD";
 
     if(result!=NRF_SUCCESS)
     {
@@ -933,7 +933,10 @@ void tcs34725_read_reg_cb(ret_code_t result, tcs34725_reg_data_t * p_raw_data)
 
     tcs34725_ble_reg_t tcs_ble_send_str;
     sprintf(tcs_ble_send_str.send_data,"%s%3d",read_reg_cb_cmd,p_raw_data->reg_data);
+<<<<<<< Updated upstream
     printf("read rgb cb : %s\r\n",tcs_ble_send_str.send_data);
+=======
+>>>>>>> Stashed changes
 
 
     if(pdTRUE!=xQueueSendToFront(m_tcs_reg_data_queue, &tcs_ble_send_str, 10))
@@ -953,7 +956,10 @@ void tcs34725_rgbc_cb(ret_code_t result, tcs34725_rgbc_data_t * p_raw_data)
         NRF_LOG_INFO("tcs rgbc callback failed");
         return;
     }
+<<<<<<< Updated upstream
     tcs34725_rgbc_print(p_raw_data);
+=======
+>>>>>>> Stashed changes
 
     tcs_rgbc_cb_str.clear=p_raw_data->clear;
     tcs_rgbc_cb_str.red=(int)((double)p_raw_data->red/p_raw_data->clear*255);
@@ -1387,9 +1393,6 @@ int main(void)
     NRF_LOG_INFO("Debug logging for UART over RTT started.");
     NRF_LOG_FLUSH();
     
-    
-    
-
     nrf_sdh_freertos_init(advertising_start,&erase_bonds);
     vTaskStartScheduler();
 
