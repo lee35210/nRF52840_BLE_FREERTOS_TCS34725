@@ -966,14 +966,14 @@ void tcs34725_rgbc_cb(ret_code_t result, tcs34725_rgbc_data_t * p_raw_data)
 
     printf("clear : %d, red : %d, blue : %d, green : %d\r\n",
             p_raw_data->clear,p_raw_data->red,p_raw_data->green,p_raw_data->blue);
-    
 
-    if(pdTRUE!=xQueueSend(m_tcs_rgb_data_queue, &tcs_rgbc_cb_str, 10))
+//    if(pdTRUE!=xQueueSend(m_tcs_rgb_data_queue, &tcs_rgbc_cb_str, 10))
+    if(pdTRUE!=xQueueOverwrite(m_tcs_rgb_data_queue, &tcs_rgbc_cb_str))
     {
         printf("xQueue send fail\r\n");
     }
-
     xTaskNotifyGive(m_ble_tcs_rgbc_send_thread);
+//    xTaskNotify(m_ble_tcs_rgbc_send_thread, 1, eSetValueWithOverwrite);
 }
 
 void tcs34725_read_thr_cb(ret_code_t result, tcs34725_threshold_data_t * p_reg_data)
@@ -1171,7 +1171,6 @@ static void tcs_wr_reg_thread(void *arg)
             printf("wr reg : %s\r\n",wr_cmd_str.cmd);
             tcs34725_cmd_func(&wr_cmd_str);
         }
-
         vTaskDelay(1000);
 //        uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
 //        printf("TCS WR STACK SIZE LEFT : %d\r\n",uxHighWaterMark2);
@@ -1199,7 +1198,7 @@ static void tcs_read_rgbc_thread(void *arg)
     while(1)
     {
         tcs34725_read_rgbc(&tcs34725_instance,&tcs_rgbc_thread,tcs34725_rgbc_cb);
-        vTaskDelay(5000);
+        vTaskDelay(1000);
     }
 }
 
@@ -1353,10 +1352,10 @@ void tcs34725_start()
     err_code=tcs34725_init(&tcs34725_instance);
     APP_ERROR_CHECK(err_code);
 
-    err_code=tcs34725_set_timing(&tcs34725_instance, 180);  //1~256
+    err_code=tcs34725_set_timing(&tcs34725_instance, 150);  //1~256
     APP_ERROR_CHECK(err_code);
 
-    err_code=tcs34725_set_wait_time(&tcs34725_instance, 255);   //1~256
+    err_code=tcs34725_set_wait_time(&tcs34725_instance, 80);   //1~256
     APP_ERROR_CHECK(err_code);
 
     err_code=tcs34725_set_persistence(&tcs34725_instance, TCS34725_OUT_OF_RANGE_3);
@@ -1365,8 +1364,8 @@ void tcs34725_start()
     err_code=tcs34725_set_gain(&tcs34725_instance, TCS34725_GAIN_x60);
     APP_ERROR_CHECK(err_code);
 
-    err_code=tcs34725_set_wait_long(&tcs34725_instance, TCS34725_WAIT_LONG_ENABLE);
-    APP_ERROR_CHECK(err_code);
+//    err_code=tcs34725_set_wait_long(&tcs34725_instance, TCS34725_WAIT_LONG_ENABLE);
+//    APP_ERROR_CHECK(err_code);
 
     err_code=tcs34725_set_threshold(&tcs34725_instance, TCS34725_THRESHOLD_LOW, 10000);
     APP_ERROR_CHECK(err_code);
