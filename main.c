@@ -1154,9 +1154,35 @@ void tcs34725_cmd_func(char *str_cmd, char *str_data)
     }
 }
 
+uint8_t tcs_cmd_find(char *cmd_data)
+{
+    if(strcmp(cmd_data,"ENA")==0)
+    {
+        return TCS34725_REG_ENABLE;
+    }
+    else if(strcmp(cmd_data,"TIM")==0)
+    {
+        return TCS34725_REG_TIMING;
+    }
+    else if(strcmp(cmd_data,"WAT")==0)
+    {
+        return TCS34725_REG_WAIT_TIME;
+    }
+    else
+    {
+    }
+
+}
+
 static void tcs_wr_reg_thread(void *arg)
 {
+    configSTACK_DEPTH_TYPE uxHighWaterMark2;
+    uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
+
+    ret_code_t err_code;
     tcs34725_cmd_t wr_cmd_str;
+    tcs34725_reg_data_t wr_reg_str;
+
     while(1)
     {
         if((ulTaskNotifyTake(pdTRUE,10)!=0)&&(pdPASS==xQueueReceive(m_tcs_cmd_queue,&wr_cmd_str,10)))
@@ -1169,8 +1195,18 @@ static void tcs_wr_reg_thread(void *arg)
                     APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
                 }
             }
+            else
+            {
+                wr_reg_str.reg_addr=tcs_cmd_find(wr_cmd_str.cmd);
+
+                printf("wr reg : %X\r\n",wr_reg_str.reg_addr);
+            }
+            tcs_cmd_func(&wr_cmd_str);
         }
+
         vTaskDelay(1000);
+        uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
+        printf("TCS WR STACK SIZE LEFT : %d\r\n",uxHighWaterMark2);
     }
 }
 
