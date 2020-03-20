@@ -177,9 +177,15 @@ static TaskHandle_t m_tcs_read_rgbc_thread;
 static TaskHandle_t m_ble_tcs_rgbc_send_thread;
 static TaskHandle_t m_tcs_reg_all_send_thread;
 static TaskHandle_t m_ble_tcs_reg_send_thread;
+static TaskHandle_t m_tcs_wr_reg_thread;
 
 static QueueHandle_t m_tcs_reg_data_queue;
 static QueueHandle_t m_tcs_rgb_data_queue;
+static QueueHandle_t m_tcs_cmd_queue;
+
+typedef struct{
+    char cmd[3],data[3];
+}tcs34725_cmd_t;
 
 void tcs34725_cmd_func(char *str_cmd, char *str_data);
 
@@ -288,12 +294,10 @@ static void nrf_qwr_error_handler(uint32_t nrf_error)
 /**@snippet [Handling the data received over BLE] */
 static void nus_data_handler(ble_nus_evt_t * p_evt)
 {
-    char str_cmd[]={"000"};
-    char str_data[]={"000"};
-
     if (p_evt->type == BLE_NUS_EVT_RX_DATA)
     {
         uint32_t err_code;
+        tcs34725_cmd_t nus_cmd_str;
 
         NRF_LOG_DEBUG("Received data from BLE NUS. Writing data on UART.");
         NRF_LOG_HEXDUMP_DEBUG(p_evt->params.rx_data.p_data, p_evt->params.rx_data.length);
@@ -315,17 +319,18 @@ static void nus_data_handler(ble_nus_evt_t * p_evt)
         {
             while (app_uart_put('\n') == NRF_ERROR_BUSY);
         }
-        memcpy(str_cmd,p_evt->params.rx_data.p_data,3);
+
+        memcpy(nus_cmd_str.cmd,p_evt->params.rx_data.p_data,3);
+
         if(3<p_evt->params.rx_data.length)
         {
-            memcpy(str_data,&p_evt->params.rx_data.p_data[3],3);
+            memcpy(nus_cmd_str.cmd,&p_evt->params.rx_data.p_data[3],3);
         }
-
-        if(strcmp(str_cmd,"000")!=0)
+        if(pdPASS!=xQueueSend(m_tcs_cmd_queue,&nus_cmd_str,10))
         {
-            printf("mode select\r\n");
-            tcs34725_cmd_func(str_cmd, str_data);
+            NRF_LOG_INFO("NUS DATA HANLDER : QUEUE SEND FAIL");
         }
+        xTaskNotifyGive(m_tcs_wr_reg_thread);
     }
 
 }
@@ -1149,6 +1154,17 @@ void tcs34725_cmd_func(char *str_cmd, char *str_data)
     }
 }
 
+static void tcs_wr_reg_thread(void *arg)
+{
+    while(1)
+    {
+        if(ulTaskNotifyTake(pdTRUE,10)!=0)
+        {
+        }
+        vTaskDelay(1000);
+    }
+}
+
 static void led_toggle_thread(void * pvParameter)
 {
     configSTACK_DEPTH_TYPE uxHighWaterMark2;
@@ -1286,6 +1302,11 @@ static void task_create_func(void)
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
     }
 
+    if(pdPASS!=xTaskCreate(tcs_wr_reg_thread, "TCS_WR_REG", configMINIMAL_STACK_SIZE+30, 
+                           NULL, 3, &m_tcs_wr_reg_thread))
+    {
+        APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
+    }
     if(pdPASS!=xTaskCreate(ble_tcs_rgbc_send_thread, "TCS_RGBC_BLE_SEND", configMINIMAL_STACK_SIZE+30, 
                            NULL, 3, &m_ble_tcs_rgbc_send_thread))
     {
@@ -1309,6 +1330,7 @@ static void queue_create_func(void)
 {
     m_tcs_reg_data_queue=xQueueCreate(8,sizeof(tcs34725_ble_reg_t));
     m_tcs_rgb_data_queue=xQueueCreate(1,sizeof(tcs34725_rgbc_data_t));
+    m_tcs_cmd_queue=xQueueCreate(8, sizeof(tcs34725_cmd_t));
 }
 
 void tcs34725_start()
