@@ -886,7 +886,7 @@ static void twi_config(void)
  */
 
 typedef struct{
-    char send_data[7];
+    char send_data[9];
 }tcs34725_ble_reg_t;
 
 void tcs34725_read_reg_cb(ret_code_t result, tcs34725_reg_data_t * p_raw_data)
@@ -950,6 +950,50 @@ void tcs34725_read_reg_cb(ret_code_t result, tcs34725_reg_data_t * p_raw_data)
     xTaskNotifyGive(m_ble_tcs_reg_send_thread);
 }
 
+void tcs34725_read_thr_cb(ret_code_t result, tcs34725_threshold_data_t * p_reg_data)
+{
+    if(result!=NRF_SUCCESS)
+    {
+        NRF_LOG_INFO("TCS34725 register read fail");
+        return;
+    }
+
+    char read_thr_cb_cmd[]="CMD";
+
+    printf("thr cb : %X %d\r\n",p_reg_data->reg_addr,p_reg_data->threshold_data);
+
+    switch(p_reg_data->reg_addr)
+    {
+        case TCS34725_REG_THRESHOLD_LOW_L :
+            break;
+        case TCS34725_REG_THRESHOLD_HIGH_L :
+            break;
+        default :
+            break;
+    }
+
+    if(p_reg_data->reg_addr==TCS34725_REG_THRESHOLD_LOW_L)
+    {
+        NRF_LOG_INFO("Threshold Low value : %d",p_reg_data->threshold_data);
+        strcpy(read_thr_cb_cmd,"THL");
+
+    }
+    else
+    {
+        NRF_LOG_INFO("Threshold High value : %d",p_reg_data->threshold_data);
+        strcpy(read_thr_cb_cmd,"THH");
+    }
+
+    tcs34725_ble_reg_t tcs_ble_send_str;
+    sprintf(tcs_ble_send_str.send_data,"%s%5d",read_thr_cb_cmd,p_reg_data->threshold_data);
+  
+    if(pdTRUE!=xQueueSend(m_tcs_reg_data_queue, &tcs_ble_send_str, 10))
+    {
+        printf("xQueue send fail\r\n");
+    }
+    xTaskNotifyGive(m_ble_tcs_reg_send_thread);
+}
+
 void tcs34725_rgbc_cb(ret_code_t result, tcs34725_rgbc_data_t * p_raw_data)
 {
     tcs34725_rgbc_data_t tcs_rgbc_cb_str;
@@ -968,33 +1012,15 @@ void tcs34725_rgbc_cb(ret_code_t result, tcs34725_rgbc_data_t * p_raw_data)
 //    printf("clear : %d, red : %d, blue : %d, green : %d\r\n",
 //            p_raw_data->clear,p_raw_data->red,p_raw_data->green,p_raw_data->blue);
 
-//    if(pdTRUE!=xQueueSend(m_tcs_rgb_data_queue, &tcs_rgbc_cb_str, 10))
-    if(pdTRUE!=xQueueOverwrite(m_tcs_rgb_data_queue, &tcs_rgbc_cb_str))
+    if(pdTRUE!=xQueueSend(m_tcs_rgb_data_queue, &tcs_rgbc_cb_str, 10))
     {
         printf("xQueue send fail\r\n");
     }
-//    xTaskNotifyGive(m_ble_tcs_rgbc_send_thread);
-//    xTaskNotify(m_ble_tcs_rgbc_send_thread, 1, eSetValueWithOverwrite);
+    xTaskNotifyGive(m_ble_tcs_rgbc_send_thread);
+    xTaskNotify(m_ble_tcs_rgbc_send_thread, 1, eSetValueWithOverwrite);
 }
 
-void tcs34725_read_thr_cb(ret_code_t result, tcs34725_threshold_data_t * p_reg_data)
-{
-    printf("thr cb : %X %d\r\n",p_reg_data->reg_addr,p_reg_data->threshold_data);
-    if(result!=NRF_SUCCESS)
-    {
-        NRF_LOG_INFO("Reading threshold regiseter is failed");
-        return;
-    }
-    if(p_reg_data->reg_addr==TCS34725_REG_THRESHOLD_LOW_L)
-    {
-        NRF_LOG_INFO("Threshold Low value : %d",p_reg_data->threshold_data);
 
-    }
-    else
-    {
-        NRF_LOG_INFO("Threshold High value : %d",p_reg_data->threshold_data);
-    }
-}
 
 /**@brief Application main function.
  */
@@ -1231,7 +1257,7 @@ static void tcs_read_rgbc_thread(void *arg)
     while(1)
     {
         tcs34725_read_rgbc(&tcs34725_instance,&tcs_rgbc_thread,tcs34725_rgbc_cb);
-        vTaskDelay(1000);
+        vTaskDelay(5000);
     }
 }
 
