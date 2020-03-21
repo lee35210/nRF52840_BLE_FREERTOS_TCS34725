@@ -960,7 +960,7 @@ void tcs34725_read_thr_cb(ret_code_t result, tcs34725_threshold_data_t * p_reg_d
 
     char read_thr_cb_cmd[]="CMD";
 
-    printf("thr cb : %X %d\r\n",p_reg_data->reg_addr,p_reg_data->threshold_data);
+//    printf("thr cb : %X %d\r\n",p_reg_data->reg_addr,p_reg_data->threshold_data);
 
     switch(p_reg_data->reg_addr)
     {
@@ -1082,7 +1082,7 @@ void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
     static tcs34725_reg_data_t tcs_cmd_str;
     ret_code_t err_code;
 
-    printf("cmd func : %s %s\r\n",cmd_func_str->cmd,cmd_func_str->data);
+//    printf("cmd func : %s %s\r\n",cmd_func_str->cmd,cmd_func_str->data);
     if(strcmp(cmd_func_str->cmd,"RAR")==0)
     {
         if(pdPASS!=xTaskCreate(tcs_read_all_reg_thread, "TCS_READ_ALL_REG", configMINIMAL_STACK_SIZE+30,
@@ -1462,7 +1462,7 @@ void in_pin_handler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action)
             NRF_LOG_INFO("TCS34725 Clear channel interrupt clear");
         }
         
-        if(pdPASS!=xQueueSend(m_tcs_cmd_queue,&tcs_int_alarm,10))
+        if(pdPASS!=xQueueSend(m_tcs_reg_data_queue,&tcs_int_alarm,10))
 //        if(pdPASS!=xQueueOverwrite(m_tcs_cmd_queue,&int_alarm))
         {
         }
