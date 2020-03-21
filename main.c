@@ -1038,6 +1038,7 @@ int chartoint(char *char_value, uint8_t length)
 static void tcs_read_all_reg_thread(void *arg)
 {
     static tcs34725_reg_data_t enable,timing,waittime,persistence,config,control,id,status;
+    static tcs34725_threshold_data_t th_low,th_high;
 
     while(1)
     {
@@ -1072,6 +1073,13 @@ static void tcs_read_all_reg_thread(void *arg)
         status.reg_addr=TCS34725_REG_STATUS;
         tcs34725_read_reg(&tcs34725_instance, &status, tcs34725_read_reg_cb);
         vTaskDelay(10);
+
+        th_low.reg_addr=TCS34725_REG_THRESHOLD_LOW_L;
+        tcs34725_read_threshold(&tcs34725_instance, TCS34725_THRESHOLD_LOW, tcs34725_read_thr_cb);
+        vTaskDelay(10);
+
+        th_high.reg_addr=TCS34725_REG_THRESHOLD_HIGH_L;
+        tcs34725_read_threshold(&tcs34725_instance, TCS34725_THRESHOLD_HIGH, tcs34725_read_thr_cb);
         
         vTaskDelete(m_tcs_reg_all_send_thread);
     }
@@ -1455,7 +1463,7 @@ void in_pin_handler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action)
         static tcs34725_ble_reg_t tcs_int_alarm={0};
         strcpy(tcs_int_alarm.send_data,"INT");
         NRF_LOG_INFO("TCS34725 RGBC Interrupt occured");
-//        err_code=tcs34725_int_clear(&tcs34725_instance);
+        err_code=tcs34725_int_clear(&tcs34725_instance);
         APP_ERROR_CHECK(err_code);
         if(err_code==NRF_SUCCESS)
         {
