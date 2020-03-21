@@ -131,7 +131,7 @@ static ble_uuid_t m_adv_uuids[]          =                                      
  */
 #include "tcs34725.h"
 
-/** @mlx90614
+/** @tcs34725
  */
 #include "nrf_drv_clock.h"
 #include "app_error.h"
@@ -141,13 +141,14 @@ static ble_uuid_t m_adv_uuids[]          =                                      
 #include "math.h"
 #include "stdio.h"
 #include "nrf_delay.h"
-
+#include "nrf_drv_gpiote.h"
 #define TWI_INSTANCE_ID 0
 #define MAX_PENDING_TRANSACTIONS 20
 
 //TWI PIN
 #define TCS34725_SDA_PIN 28
 #define TCS34725_SCL_PIN 29
+#define TCS34725_INT_PIN 31
 
 //Macro that simplifies defining a TWI transaction manager instance.
 NRF_TWI_MNGR_DEF(m_nrf_twi_mngr, MAX_PENDING_TRANSACTIONS, TWI_INSTANCE_ID);
@@ -186,6 +187,10 @@ static QueueHandle_t m_tcs_cmd_queue;
 typedef struct{
     char cmd[4],data[6];
 }tcs34725_cmd_t;
+
+typedef struct{
+    char send_data[9];
+}tcs34725_ble_reg_t;
 
 void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str);
 
@@ -884,11 +889,6 @@ static void twi_config(void)
 
 /*@Callback
  */
-
-typedef struct{
-    char send_data[9];
-}tcs34725_ble_reg_t;
-
 void tcs34725_read_reg_cb(ret_code_t result, tcs34725_reg_data_t * p_raw_data)
 {
     char read_reg_cb_cmd[]="CMD";
@@ -1446,6 +1446,47 @@ void tcs34725_read_config()
     APP_ERROR_CHECK(err_code);
 }
 
+
+void in_pin_handler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action)
+{
+    if(pin==TCS34725_INT_PIN)
+    {
+        ret_code_t err_code;
+        static tcs34725_ble_reg_t tcs_int_alarm={0};
+        strcpy(tcs_int_alarm.send_data,"INT");
+        NRF_LOG_INFO("TCS34725 RGBC Interrupt occured");
+//        err_code=tcs34725_int_clear(&tcs34725_instance);
+        APP_ERROR_CHECK(err_code);
+        if(err_code==NRF_SUCCESS)
+        {
+            NRF_LOG_INFO("TCS34725 Clear channel interrupt clear");
+        }
+        
+        if(pdPASS!=xQueueSend(m_tcs_cmd_queue,&tcs_int_alarm,10))
+//        if(pdPASS!=xQueueOverwrite(m_tcs_cmd_queue,&int_alarm))
+        {
+        }
+        xTaskNotifyGive(m_ble_tcs_reg_send_thread);
+
+    }
+}
+
+static void gpio_init(void)
+{
+    ret_code_t err_code;
+
+    err_code = nrf_drv_gpiote_init();
+    APP_ERROR_CHECK(err_code);
+
+    nrf_drv_gpiote_in_config_t in_config = GPIOTE_CONFIG_IN_SENSE_HITOLO(true);
+    in_config.pull = NRF_GPIO_PIN_PULLUP;
+
+    err_code = nrf_drv_gpiote_in_init(TCS34725_INT_PIN, &in_config, in_pin_handler);
+    APP_ERROR_CHECK(err_code);
+
+    nrf_drv_gpiote_in_event_enable(TCS34725_INT_PIN, true);
+}
+
 int main(void)
 {
     ret_code_t err_code;
@@ -1456,6 +1497,7 @@ int main(void)
     bsp_board_init(BSP_INIT_LEDS);
     clock_init();
     timers_init();
+    gpio_init();
     power_management_init();
     ble_stack_init();
     gap_params_init();
