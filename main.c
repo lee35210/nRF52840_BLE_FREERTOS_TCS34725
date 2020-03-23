@@ -193,6 +193,8 @@ typedef struct{
 }tcs34725_ble_reg_t;
 
 void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str);
+tcs34725_persistence_t tcs34725_per_dectobin(uint8_t dec_value);
+int tcs34725_per_bintodec(tcs34725_persistence_t bit_value);
 
 #if NRF_LOG_ENABLED
 static TaskHandle_t m_logger_thread;                                /**< Definition of Logger thread. */
@@ -892,6 +894,7 @@ static void twi_config(void)
 void tcs34725_read_reg_cb(ret_code_t result, tcs34725_reg_data_t * p_raw_data)
 {
     char read_reg_cb_cmd[]="CMD";
+    uint8_t persistence_value;
 
     if(result!=NRF_SUCCESS)
     {
@@ -919,6 +922,9 @@ void tcs34725_read_reg_cb(ret_code_t result, tcs34725_reg_data_t * p_raw_data)
         case TCS34725_REG_PERSISTENCE :
             NRF_LOG_INFO("Persistence register : %X",p_raw_data->reg_data);
             strcpy(read_reg_cb_cmd,"PER");
+            persistence_value=p_raw_data->reg_data;
+            persistence_value=tcs34725_per_bintodec(persistence_value);
+            p_raw_data->reg_data=persistence_value;
             break;
         case TCS34725_REG_CONFIG :
             NRF_LOG_INFO("Configuration register : %X",p_raw_data->reg_data);
@@ -943,9 +949,19 @@ void tcs34725_read_reg_cb(ret_code_t result, tcs34725_reg_data_t * p_raw_data)
     tcs34725_ble_reg_t tcs_ble_send_str;
     sprintf(tcs_ble_send_str.send_data,"%s%3d",read_reg_cb_cmd,p_raw_data->reg_data);
   
-    if(pdTRUE!=xQueueSend(m_tcs_reg_data_queue, &tcs_ble_send_str, 10))
+    if(uxQueueSpacesAvailable(m_tcs_reg_data_queue)!=0) //The number of free spaces available in the queue.
     {
-        printf("xQueue send fail\r\n");
+        if(pdPASS!=xQueueSend(m_tcs_reg_data_queue,&tcs_ble_send_str,10))
+        {
+            //queue send fail
+        }
+    }
+    else    //queue full
+    {
+        if(pdPASS!=xQueueOverwrite(m_tcs_reg_data_queue,&tcs_ble_send_str))
+        {
+            //queue send fail
+        }
     }
     xTaskNotifyGive(m_ble_tcs_reg_send_thread);
 }
@@ -986,12 +1002,23 @@ void tcs34725_read_thr_cb(ret_code_t result, tcs34725_threshold_data_t * p_reg_d
 
     tcs34725_ble_reg_t tcs_ble_send_str;
     sprintf(tcs_ble_send_str.send_data,"%s%5d",read_thr_cb_cmd,p_reg_data->threshold_data);
-  
-    if(pdTRUE!=xQueueSend(m_tcs_reg_data_queue, &tcs_ble_send_str, 10))
+
+    if(uxQueueSpacesAvailable(m_tcs_reg_data_queue)!=0) //The number of free spaces available in the queue.
     {
-        printf("xQueue send fail\r\n");
+        if(pdPASS!=xQueueSend(m_tcs_reg_data_queue,&tcs_ble_send_str,10))
+        {
+            //queue send fail
+        }
+    }
+    else    //queue full
+    {
+        if(pdPASS!=xQueueOverwrite(m_tcs_reg_data_queue,&tcs_ble_send_str))
+        {
+            //queue send fail
+        }
     }
     xTaskNotifyGive(m_ble_tcs_reg_send_thread);
+
 }
 
 void tcs34725_rgbc_cb(ret_code_t result, tcs34725_rgbc_data_t * p_raw_data)
@@ -1181,6 +1208,27 @@ void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
         if(err_code!=NRF_SUCCESS)
         {
             NRF_LOG_INFO("Read wait long fail");
+            return;
+        }
+    }
+    else if(strcmp(cmd_func_str->cmd,"PER")==0)
+    {
+        uint8_t persistence_val;
+        NRF_LOG_INFO("Set Persistence");
+        persistence_val=chartoint(cmd_func_str->data,3);
+        persistence_val=tcs34725_per_dectobin(persistence_val);
+        printf("per : %d\r\n",persistence_val);
+        err_code=tcs34725_set_persistence(&tcs34725_instance,persistence_val);
+        if(err_code!=NRF_SUCCESS)
+        {
+            NRF_LOG_INFO("Set Persistence fail");
+            return;
+        }
+        tcs_cmd_str.reg_addr=TCS34725_REG_PERSISTENCE;
+        err_code=tcs34725_read_reg(&tcs34725_instance,&tcs_cmd_str,tcs34725_read_reg_cb);
+        if(err_code!=NRF_SUCCESS)
+        {
+            NRF_LOG_INFO("Read Persistence fail");
             return;
         }
     }
@@ -1422,13 +1470,13 @@ void tcs34725_start()
     err_code=tcs34725_set_timing(&tcs34725_instance, 150);  //1~256
     APP_ERROR_CHECK(err_code);
 
-    err_code=tcs34725_set_wait_time(&tcs34725_instance, 80);   //1~256
+    err_code=tcs34725_set_wait_time(&tcs34725_instance, 50);   //1~256
     APP_ERROR_CHECK(err_code);
 
-    err_code=tcs34725_set_persistence(&tcs34725_instance, TCS34725_OUT_OF_RANGE_3);
+    err_code=tcs34725_set_persistence(&tcs34725_instance, TCS34725_OUT_OF_RANGE_60);
     APP_ERROR_CHECK(err_code);
 
-    err_code=tcs34725_set_gain(&tcs34725_instance, TCS34725_GAIN_x60);
+    err_code=tcs34725_set_gain(&tcs34725_instance, TCS34725_GAIN_60x);
     APP_ERROR_CHECK(err_code);
 
 //    err_code=tcs34725_set_wait_long(&tcs34725_instance, TCS34725_WAIT_LONG_ENABLE);
@@ -1460,6 +1508,7 @@ void in_pin_handler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action)
     if(pin==TCS34725_INT_PIN)
     {
         ret_code_t err_code;
+        int queue_space;
         static tcs34725_ble_reg_t tcs_int_alarm={0};
         strcpy(tcs_int_alarm.send_data,"INT");
         NRF_LOG_INFO("TCS34725 RGBC Interrupt occured");
@@ -1470,12 +1519,22 @@ void in_pin_handler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action)
             NRF_LOG_INFO("TCS34725 Clear channel interrupt clear");
         }
         
-        if(pdPASS!=xQueueSend(m_tcs_reg_data_queue,&tcs_int_alarm,10))
-//        if(pdPASS!=xQueueOverwrite(m_tcs_cmd_queue,&int_alarm))
+        
+        if(uxQueueSpacesAvailable(m_tcs_reg_data_queue)!=0) //The number of free spaces available in the queue.
         {
+            if(pdPASS!=xQueueSend(m_tcs_reg_data_queue,&tcs_int_alarm,10))
+            {
+                //queue send fail
+            }
+        }
+        else    //queue full
+        {
+            if(pdPASS!=xQueueOverwrite(m_tcs_reg_data_queue,&tcs_int_alarm))
+            {
+                //queue send fail
+            }
         }
         xTaskNotifyGive(m_ble_tcs_reg_send_thread);
-
     }
 }
 
@@ -1493,6 +1552,129 @@ static void gpio_init(void)
     APP_ERROR_CHECK(err_code);
 
     nrf_drv_gpiote_in_event_enable(TCS34725_INT_PIN, true);
+}
+
+int tcs34725_per_bintodec(tcs34725_persistence_t bit_value)
+{
+    uint8_t dec_value;
+    printf("binary : %d\r\n",bit_value);
+    switch(bit_value)
+    {
+        case TCS34725_OUT_OF_RANGE_0 :
+            dec_value=0;
+            break;
+        case TCS34725_OUT_OF_RANGE_1 :
+            dec_value=1;
+            break;
+        case TCS34725_OUT_OF_RANGE_2 :
+            dec_value=2;
+            break;
+        case TCS34725_OUT_OF_RANGE_3 :
+            dec_value=3;
+            break;
+        case TCS34725_OUT_OF_RANGE_5 :
+            dec_value=5;
+            break;
+        case TCS34725_OUT_OF_RANGE_10 :
+            dec_value=10;
+            break;
+        case TCS34725_OUT_OF_RANGE_15 :
+            dec_value=15;
+            break;
+        case TCS34725_OUT_OF_RANGE_20 :
+            dec_value=20;
+            break;
+        case TCS34725_OUT_OF_RANGE_25 :
+            dec_value=25;
+            break;
+        case TCS34725_OUT_OF_RANGE_30 :
+            dec_value=30;
+            break;
+        case TCS34725_OUT_OF_RANGE_35 :
+            dec_value=35;
+            break;
+        case TCS34725_OUT_OF_RANGE_40 :
+            dec_value=40;
+            break;
+        case TCS34725_OUT_OF_RANGE_45 :
+            dec_value=45;
+            break;
+        case TCS34725_OUT_OF_RANGE_50 :
+            dec_value=50;
+            break;
+        case TCS34725_OUT_OF_RANGE_55 :
+            dec_value=55;
+            break;
+        case TCS34725_OUT_OF_RANGE_60 :
+            dec_value=60;
+            break;
+        default :
+            dec_value=0;
+            break;
+    }
+    printf("decimal : %d\r\n",dec_value);
+    return dec_value;
+    
+}
+
+tcs34725_persistence_t tcs34725_per_dectobin(uint8_t dec_value)
+{
+    tcs34725_persistence_t bin_value;
+    switch(dec_value)
+    {
+        case 0 :
+            bin_value=TCS34725_OUT_OF_RANGE_0;
+            break;
+        case 1 :
+            bin_value=TCS34725_OUT_OF_RANGE_1;
+            break;
+        case 2 :
+            bin_value=TCS34725_OUT_OF_RANGE_2;
+            break;
+        case 3 :
+            bin_value=TCS34725_OUT_OF_RANGE_3;
+            break;
+        case 5 :
+            bin_value=TCS34725_OUT_OF_RANGE_5;
+            break;
+        case 10 :
+            bin_value=TCS34725_OUT_OF_RANGE_10;
+            break;
+        case 15 :
+            bin_value=TCS34725_OUT_OF_RANGE_15;
+            break;
+        case 20 :
+            bin_value=TCS34725_OUT_OF_RANGE_20;
+            break;
+        case 25 :
+            bin_value=TCS34725_OUT_OF_RANGE_25;
+            break;
+        case 30 :
+            bin_value=TCS34725_OUT_OF_RANGE_30;
+            break;
+        case 35 :
+            bin_value=TCS34725_OUT_OF_RANGE_35;
+            break;
+        case 40 :
+            bin_value=TCS34725_OUT_OF_RANGE_40;
+            break;
+        case 45 :
+            bin_value=TCS34725_OUT_OF_RANGE_45;
+            break;
+        case 50 :
+            bin_value=TCS34725_OUT_OF_RANGE_50;
+            break;
+        case 55 :
+            bin_value=TCS34725_OUT_OF_RANGE_55;
+            break;
+        case 60 :
+            bin_value=TCS34725_OUT_OF_RANGE_60;
+            break;
+        default :
+            bin_value=0;
+            break;
+    }
+    return bin_value;
 }
 
 int main(void)

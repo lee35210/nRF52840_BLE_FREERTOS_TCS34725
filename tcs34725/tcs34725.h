@@ -108,10 +108,10 @@ typedef enum
 
 typedef enum
 {
-    TCS34725_GAIN_x1,
-    TCS34725_GAIN_x4,
-    TCS34725_GAIN_x16,
-    TCS34725_GAIN_x60
+    TCS34725_GAIN_1x,
+    TCS34725_GAIN_4x,
+    TCS34725_GAIN_16x,
+    TCS34725_GAIN_60x
 }tcs34725_gain_t;
 
 /**
