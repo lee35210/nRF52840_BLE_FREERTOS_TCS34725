@@ -339,7 +339,9 @@ static void nus_data_handler(ble_nus_evt_t * p_evt)
         {
             memcpy(nus_cmd_str.data,&p_evt->params.rx_data.p_data[3],5);
         }
-        if(pdPASS!=xQueueSend(m_tcs_cmd_queue,&nus_cmd_str,10))
+
+//        if(pdPASS!=xQueueSend(m_tcs_cmd_queue,&nus_cmd_str,10))
+        if(pdPASS!=xQueueOverwrite(m_tcs_cmd_queue,&nus_cmd_str));
         {
             NRF_LOG_INFO("NUS DATA HANLDER : QUEUE SEND FAIL");
         }
@@ -897,6 +899,7 @@ void tcs34725_read_reg_cb(ret_code_t result, tcs34725_reg_data_t * p_raw_data)
 {
     char read_reg_cb_cmd[]="CMD";
     uint8_t persistence_value;
+    uint8_t queue_left;
 
     if(result!=NRF_SUCCESS)
     {
@@ -1020,7 +1023,6 @@ void tcs34725_read_thr_cb(ret_code_t result, tcs34725_threshold_data_t * p_reg_d
         }
     }
     xTaskNotifyGive(m_ble_tcs_reg_send_thread);
-
 }
 
 void tcs34725_rgbc_cb(ret_code_t result, tcs34725_rgbc_data_t * p_raw_data)
@@ -1046,7 +1048,6 @@ void tcs34725_rgbc_cb(ret_code_t result, tcs34725_rgbc_data_t * p_raw_data)
         printf("xQueue send fail\r\n");
     }
     xTaskNotifyGive(m_ble_tcs_rgbc_send_thread);
-    xTaskNotify(m_ble_tcs_rgbc_send_thread, 1, eSetValueWithOverwrite);
 }
 
 
