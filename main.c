@@ -196,6 +196,8 @@ void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str);
 tcs34725_persistence_t tcs34725_per_dectobin(uint8_t dec_value);
 int tcs34725_per_bintodec(tcs34725_persistence_t bit_value);
 
+#define STACK_SIZE_CHK
+
 #if NRF_LOG_ENABLED
 static TaskHandle_t m_logger_thread;                                /**< Definition of Logger thread. */
 #endif
@@ -1064,6 +1066,12 @@ int chartoint(char *char_value, uint8_t length)
 
 static void tcs_read_all_reg_thread(void *arg)
 {
+    #ifdef STACK_SIZE_CHK
+    configSTACK_DEPTH_TYPE uxHighWaterMark2;
+    uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
+    uint8_t stack_left=255;
+    #endif
+
     static tcs34725_reg_data_t enable,timing,waittime,persistence,config,control,id,status;
     static tcs34725_threshold_data_t th_low,th_high;
 
@@ -1108,6 +1116,15 @@ static void tcs_read_all_reg_thread(void *arg)
         th_high.reg_addr=TCS34725_REG_THRESHOLD_HIGH_L;
         tcs34725_read_threshold(&tcs34725_instance, TCS34725_THRESHOLD_HIGH, tcs34725_read_thr_cb);
         
+        #ifdef STACK_SIZE_CHK
+        uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
+        if(uxHighWaterMark2<stack_left)
+        {
+            stack_left=uxHighWaterMark2;
+            printf("TCS all read stack left : %d\r\n",stack_left);
+        }
+        #endif
+
         vTaskDelete(m_tcs_reg_all_send_thread);
     }
 }
@@ -1217,7 +1234,6 @@ void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
         NRF_LOG_INFO("Set Persistence");
         persistence_val=chartoint(cmd_func_str->data,3);
         persistence_val=tcs34725_per_dectobin(persistence_val);
-        printf("per : %d\r\n",persistence_val);
         err_code=tcs34725_set_persistence(&tcs34725_instance,persistence_val);
         if(err_code!=NRF_SUCCESS)
         {
@@ -1272,8 +1288,11 @@ void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
 
 static void tcs_wr_reg_thread(void *arg)
 {
-//    configSTACK_DEPTH_TYPE uxHighWaterMark2;
-//    uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
+    #ifdef STACK_SIZE_CHK
+    configSTACK_DEPTH_TYPE uxHighWaterMark2;
+    uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
+    uint8_t stack_left=255;
+    #endif
 
     ret_code_t err_code;
     tcs34725_cmd_t wr_cmd_str;
@@ -1286,46 +1305,82 @@ static void tcs_wr_reg_thread(void *arg)
             printf("wr reg : %s\r\n",wr_cmd_str.cmd);
             tcs34725_cmd_func(&wr_cmd_str);
         }
-        vTaskDelay(1000);
-//        uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
-//        printf("TCS WR STACK SIZE LEFT : %d\r\n",uxHighWaterMark2);
+        vTaskDelay(500);
+
+        #ifdef STACK_SIZE_CHK
+        uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
+        if(uxHighWaterMark2<stack_left)
+        {
+            stack_left=uxHighWaterMark2;
+            printf("TCS WR STACK LEFT : %d\r\n",uxHighWaterMark2);
+        }
+        #endif
     }
 }
 
 static void led_toggle_thread(void * pvParameter)
 {
+    #ifdef STACK_SIZE_CHK
     configSTACK_DEPTH_TYPE uxHighWaterMark2;
     uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
+    uint8_t stack_left=255;
+    #endif
 
     UNUSED_PARAMETER(pvParameter);
     while (true)
     {
         bsp_board_led_invert(BSP_BOARD_LED_0);
         vTaskDelay(1000);
+
+        #ifdef STACK_SIZE_CHK
         uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
-//        printf("LED : %d\r\n",uxHighWaterMark2);
+        if(uxHighWaterMark2<stack_left)
+        {
+            stack_left=uxHighWaterMark2;
+            printf("LED stack left : %d\r\n",uxHighWaterMark2);
+        }
+        #endif
     }
 }
 
 static void tcs_read_rgbc_thread(void *arg)
 {
+    #ifdef STACK_SIZE_CHK
+    configSTACK_DEPTH_TYPE uxHighWaterMark2;
+    uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
+    uint8_t stack_left=255;
+    #endif
+
     tcs34725_rgbc_data_t tcs_rgbc_thread;
+    
     while(1)
     {
         tcs34725_read_rgbc(&tcs34725_instance,&tcs_rgbc_thread,tcs34725_rgbc_cb);
-        vTaskDelay(5000);
+        vTaskDelay(200);
+
+        #ifdef STACK_SIZE_CHK
+        uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
+        if(uxHighWaterMark2<stack_left)
+        {
+            stack_left=uxHighWaterMark2;
+            printf("rgbc read stack left : %d\r\n",uxHighWaterMark2);
+        }
+        #endif
     }
 }
 
 static void ble_tcs_rgbc_send_thread(void *arg)
 {
+    #ifdef STACK_SIZE_CHK
+    configSTACK_DEPTH_TYPE uxHighWaterMark2;
+    uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
+    uint8_t stack_left=255;
+    #endif
+
     ret_code_t err_code;
     tcs34725_rgbc_data_t ble_tcs_send_rgb;
     char data_array[18]={};
     uint16_t length=sizeof(data_array);
-
-    configSTACK_DEPTH_TYPE uxHighWaterMark2;
-    uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
 
     while(1)
     {
@@ -1348,20 +1403,29 @@ static void ble_tcs_rgbc_send_thread(void *arg)
                     APP_ERROR_CHECK(err_code);
                 }
             }
-//            uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
-//            printf("BLE UART : %d\r\n",uxHighWaterMark2);
+            #ifdef STACK_SIZE_CHK
+            uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
+            if(uxHighWaterMark2<stack_left)
+            {
+                stack_left=uxHighWaterMark2;
+                printf("BLE rgbc stack left : %d\r\n",uxHighWaterMark2);
+            }
+            #endif
         }
     }
 }
 
 static void ble_tcs_reg_send_thread(void *arg)
 {
+    #ifdef STACK_SIZE_CHK
+    configSTACK_DEPTH_TYPE uxHighWaterMark2;
+    uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
+    uint8_t stack_left=255;
+    #endif
+
     ret_code_t err_code;
     tcs34725_ble_reg_t ble_tcs_send_reg;
     uint16_t length=sizeof(ble_tcs_send_reg);
-
-//    configSTACK_DEPTH_TYPE uxHighWaterMark2;
-//    uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
 
     while(1)
     {
@@ -1371,7 +1435,6 @@ static void ble_tcs_reg_send_thread(void *arg)
             {
                 //fail
             }
-            printf("ble reg : %s\r\n",ble_tcs_send_reg.send_data);
             if(m_conn_handle!=BLE_CONN_HANDLE_INVALID)
             {
                 err_code=ble_nus_data_send(&m_nus, ble_tcs_send_reg.send_data, &length, m_conn_handle);
@@ -1382,8 +1445,14 @@ static void ble_tcs_reg_send_thread(void *arg)
                     APP_ERROR_CHECK(err_code);
                 }
             }
-//            uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
-//            printf("BLE UART : %d\r\n",uxHighWaterMark2);
+            #ifdef STACK_SIZE_CHK
+            uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
+            if(uxHighWaterMark2<stack_left)
+            {
+                stack_left=uxHighWaterMark2;
+                printf("BLE reg send stack left : %d\r\n",uxHighWaterMark2);
+            }
+            #endif
         }
     }
 }
@@ -1423,34 +1492,34 @@ static void logger_thread(void * arg)
 static void task_create_func(void)
 {
     
-    if(pdPASS!=xTaskCreate(tcs_read_rgbc_thread, "TCS_RGBC_READ", configMINIMAL_STACK_SIZE+30, 
+    if(pdPASS!=xTaskCreate(tcs_read_rgbc_thread, "TCS_RGBC_READ", configMINIMAL_STACK_SIZE+60, 
                            NULL, 3, &m_tcs_read_rgbc_thread))
     {
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
     }
 
-    if(pdPASS!=xTaskCreate(tcs_wr_reg_thread, "TCS_WR_REG", configMINIMAL_STACK_SIZE+100, 
+    if(pdPASS!=xTaskCreate(tcs_wr_reg_thread, "TCS_WR_REG", configMINIMAL_STACK_SIZE+160, 
                            NULL, 3, &m_tcs_wr_reg_thread))
     {
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
     }
-    if(pdPASS!=xTaskCreate(ble_tcs_rgbc_send_thread, "TCS_RGBC_BLE_SEND", configMINIMAL_STACK_SIZE+30, 
+    if(pdPASS!=xTaskCreate(ble_tcs_rgbc_send_thread, "TCS_RGBC_BLE_SEND", configMINIMAL_STACK_SIZE+60, 
                            NULL, 3, &m_ble_tcs_rgbc_send_thread))
     {
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
     }
 
-    if(pdPASS!=xTaskCreate(ble_tcs_reg_send_thread, "TCS_REG_BLE_SEND", configMINIMAL_STACK_SIZE+30,
+    if(pdPASS!=xTaskCreate(ble_tcs_reg_send_thread, "TCS_REG_BLE_SEND", configMINIMAL_STACK_SIZE+60,
                            NULL, 3, &m_ble_tcs_reg_send_thread))
     {
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
     }
-//#if NRF_LOG_ENABLED
-//    if (pdPASS!=xTaskCreate(logger_thread, "LOGGER", configMINIMAL_STACK_SIZE+60, NULL, 1, &m_logger_thread))
-//    {
-//        APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
-//    }
-//#endif
+#if NRF_LOG_ENABLED
+    if (pdPASS!=xTaskCreate(logger_thread, "LOGGER", configMINIMAL_STACK_SIZE+250, NULL, 1, &m_logger_thread))
+    {
+        APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
+    }
+#endif
 }
 
 static void queue_create_func(void)
@@ -1557,7 +1626,6 @@ static void gpio_init(void)
 int tcs34725_per_bintodec(tcs34725_persistence_t bit_value)
 {
     uint8_t dec_value;
-    printf("binary : %d\r\n",bit_value);
     switch(bit_value)
     {
         case TCS34725_OUT_OF_RANGE_0 :
@@ -1612,7 +1680,6 @@ int tcs34725_per_bintodec(tcs34725_persistence_t bit_value)
             dec_value=0;
             break;
     }
-    printf("decimal : %d\r\n",dec_value);
     return dec_value;
     
 }
