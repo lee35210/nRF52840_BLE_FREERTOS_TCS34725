@@ -186,7 +186,7 @@ static QueueHandle_t m_tcs_cmd_queue;
 void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str);
 static void tcs_read_all_reg_thread(void *arg);
 
-#define STACK_SIZE_CHK
+#define STACK_SIZE_CHK  //For checking thread stack size
 
 #if NRF_LOG_ENABLED
 static TaskHandle_t m_logger_thread;                                /**< Definition of Logger thread. */
@@ -889,6 +889,208 @@ static void twi_config(void)
     APP_ERROR_CHECK(err_code);
 }
 
+/**@brief A function which is hooked to idle task.
+ * @note Idle hook must be enabled in FreeRTOS configuration (configUSE_IDLE_HOOK).
+ */
+void vApplicationIdleHook( void )
+{
+#if NRF_LOG_ENABLED
+     vTaskResume(m_logger_thread);
+#endif
+}
+
+/**@brief Function for initializing the clock.
+ */
+static void clock_init(void)
+{
+    ret_code_t err_code = nrf_drv_clock_init();
+    APP_ERROR_CHECK(err_code);
+}
+
+/*@Threads
+ */
+#if NRF_LOG_ENABLED
+static void logger_thread(void * arg)
+{
+    UNUSED_PARAMETER(arg);
+
+    while (1)
+    {
+        NRF_LOG_FLUSH();
+
+        vTaskSuspend(NULL); // Suspend myself
+    }
+}
+#endif
+
+/**@brief Application main function.
+ */
+int chartoint(char *char_value, uint8_t length)
+{
+    uint16_t int_val=0;
+    for(int i=length-1; 0<=i; i--)
+    {
+        int_val+=((int)*char_value-48)*(pow(10,i));
+        char_value++;
+    }
+    return int_val;
+}
+
+void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
+{
+    static tcs34725_reg_data_t tcs_cmd_str;
+    ret_code_t err_code;
+
+    if(strcmp(cmd_func_str->cmd,"RAR")==0)
+    {
+        if(pdPASS!=xTaskCreate(tcs_read_all_reg_thread, "TCS_READ_ALL_REG", configMINIMAL_STACK_SIZE+30,
+                       NULL, 3, &m_tcs_reg_all_send_thread))
+        {
+            APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
+        }
+    }
+    else if(strcmp(cmd_func_str->cmd,"TIM")==0)
+    {
+        NRF_LOG_INFO("Set Timming");
+        err_code=tcs34725_set_timing(&tcs34725_instance,chartoint(cmd_func_str->data,3));
+        if(err_code!=NRF_SUCCESS)
+        {
+            NRF_LOG_INFO("Set timing fail");
+            return;
+        }
+        tcs_cmd_str.reg_addr=TCS34725_REG_TIMING;
+        err_code=tcs34725_read_reg(&tcs34725_instance,&tcs_cmd_str,tcs34725_read_reg_cb);
+        if(err_code!=NRF_SUCCESS)
+        {
+            NRF_LOG_INFO("Read timing fail");
+            return;
+        }
+    }
+    else if(strcmp(cmd_func_str->cmd,"WAT")==0)
+    {
+        NRF_LOG_INFO("Set Wait Time");
+        err_code=tcs34725_set_wait_time(&tcs34725_instance,chartoint(cmd_func_str->data,3));
+        if(err_code!=NRF_SUCCESS)
+        {
+            NRF_LOG_INFO("Set wait time fail");
+            return;
+        }
+        tcs_cmd_str.reg_addr=TCS34725_REG_WAIT_TIME;
+        err_code=tcs34725_read_reg(&tcs34725_instance,&tcs_cmd_str,tcs34725_read_reg_cb);
+        if(err_code!=NRF_SUCCESS)
+        {
+            NRF_LOG_INFO("Read wait time fail");
+            return;
+        }
+    }
+    else if(strcmp(cmd_func_str->cmd,"GIN")==0)
+    {
+        NRF_LOG_INFO("Set gain");
+        err_code=tcs34725_set_gain(&tcs34725_instance,chartoint(cmd_func_str->data,3));
+        if(err_code!=NRF_SUCCESS)
+        {
+            NRF_LOG_INFO("Set gain fail");
+            return;
+        }
+        tcs_cmd_str.reg_addr=TCS34725_REG_CONTROL;
+        err_code=tcs34725_read_reg(&tcs34725_instance,&tcs_cmd_str,tcs34725_read_reg_cb);
+        if(err_code!=NRF_SUCCESS)
+        {
+            NRF_LOG_INFO("Read gain fail");
+            return;
+        }
+    }
+    else if(strcmp(cmd_func_str->cmd,"ENA")==0)
+    {
+        NRF_LOG_INFO("Set interrupt");
+        err_code=tcs34725_set_interrupt(&tcs34725_instance,chartoint(cmd_func_str->data,3));
+        if(err_code!=NRF_SUCCESS)
+        {
+            NRF_LOG_INFO("Set interrupt fail");
+            return;
+        }
+        tcs_cmd_str.reg_addr=TCS34725_REG_ENABLE;
+        err_code=tcs34725_read_reg(&tcs34725_instance,&tcs_cmd_str,tcs34725_read_reg_cb);
+        if(err_code!=NRF_SUCCESS)
+        {
+            NRF_LOG_INFO("Read interrupt fail");
+            return;
+        }
+    }
+    else if(strcmp(cmd_func_str->cmd,"WLO")==0)
+    {
+        NRF_LOG_INFO("Set wait long");
+        err_code=tcs34725_set_wait_long(&tcs34725_instance,chartoint(cmd_func_str->data,3));
+        if(err_code!=NRF_SUCCESS)
+        {
+            NRF_LOG_INFO("Set wait long fail");
+            return;
+        }
+        tcs_cmd_str.reg_addr=TCS34725_REG_CONFIG;
+        err_code=tcs34725_read_reg(&tcs34725_instance,&tcs_cmd_str,tcs34725_read_reg_cb);
+        if(err_code!=NRF_SUCCESS)
+        {
+            NRF_LOG_INFO("Read wait long fail");
+            return;
+        }
+    }
+    else if(strcmp(cmd_func_str->cmd,"PER")==0)
+    {
+        uint8_t persistence_val;
+        NRF_LOG_INFO("Set Persistence");
+        persistence_val=chartoint(cmd_func_str->data,3);
+        persistence_val=tcs34725_per_dectobin(persistence_val);
+        err_code=tcs34725_set_persistence(&tcs34725_instance,persistence_val);
+        if(err_code!=NRF_SUCCESS)
+        {
+            NRF_LOG_INFO("Set Persistence fail");
+            return;
+        }
+        tcs_cmd_str.reg_addr=TCS34725_REG_PERSISTENCE;
+        err_code=tcs34725_read_reg(&tcs34725_instance,&tcs_cmd_str,tcs34725_read_reg_cb);
+        if(err_code!=NRF_SUCCESS)
+        {
+            NRF_LOG_INFO("Read Persistence fail");
+            return;
+        }
+    }
+    else if(strcmp(cmd_func_str->cmd,"THL")==0)
+    {
+        NRF_LOG_INFO("Set Threshold Low");
+        err_code=tcs34725_set_threshold(&tcs34725_instance,TCS34725_THRESHOLD_LOW,chartoint(cmd_func_str->data,5));
+        if(err_code!=NRF_SUCCESS)
+        {
+            NRF_LOG_INFO("Set Threshold Low fail");
+            return;
+        }
+        err_code=tcs34725_read_threshold(&tcs34725_instance, TCS34725_THRESHOLD_LOW, tcs34725_read_thr_cb);
+        if(err_code!=NRF_SUCCESS)
+        {
+            NRF_LOG_INFO("Read Threshold Low fail");
+            return;
+        }
+    }
+    else if(strcmp(cmd_func_str->cmd,"THH")==0)
+    {
+        NRF_LOG_INFO("Set Threshold High");
+        err_code=tcs34725_set_threshold(&tcs34725_instance,TCS34725_THRESHOLD_HIGH,chartoint(cmd_func_str->data,5));
+        if(err_code!=NRF_SUCCESS)
+        {
+            NRF_LOG_INFO("Set Threshold High fail");
+            return;
+        }
+        err_code=tcs34725_read_threshold(&tcs34725_instance, TCS34725_THRESHOLD_HIGH, tcs34725_read_thr_cb);
+        if(err_code!=NRF_SUCCESS)
+        {
+            NRF_LOG_INFO("Read Threshold High fail");
+            return;
+        }
+    }
+    else
+    {
+        return;
+    }
+}
 
 /*@Callback
  */
@@ -1046,177 +1248,8 @@ void tcs34725_rgbc_cb(ret_code_t result, tcs34725_rgbc_data_t * p_raw_data)
     }
 }
 
-
-/**@brief Application main function.
+/* Thread
  */
-int chartoint(char *char_value, uint8_t length)
-{
-    uint16_t int_val=0;
-    for(int i=length-1; 0<=i; i--)
-    {
-        int_val+=((int)*char_value-48)*(pow(10,i));
-        char_value++;
-    }
-    return int_val;
-}
-
-void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
-{
-    static tcs34725_reg_data_t tcs_cmd_str;
-    ret_code_t err_code;
-
-//    printf("cmd func : %s %s\r\n",cmd_func_str->cmd,cmd_func_str->data);
-    if(strcmp(cmd_func_str->cmd,"RAR")==0)
-    {
-        if(pdPASS!=xTaskCreate(tcs_read_all_reg_thread, "TCS_READ_ALL_REG", configMINIMAL_STACK_SIZE+30,
-                       NULL, 3, &m_tcs_reg_all_send_thread))
-        {
-            APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
-        }
-    }
-    else if(strcmp(cmd_func_str->cmd,"TIM")==0)
-    {
-        NRF_LOG_INFO("Set Timming");
-        err_code=tcs34725_set_timing(&tcs34725_instance,chartoint(cmd_func_str->data,3));
-        if(err_code!=NRF_SUCCESS)
-        {
-            NRF_LOG_INFO("Set timing fail");
-            return;
-        }
-        tcs_cmd_str.reg_addr=TCS34725_REG_TIMING;
-        err_code=tcs34725_read_reg(&tcs34725_instance,&tcs_cmd_str,tcs34725_read_reg_cb);
-        if(err_code!=NRF_SUCCESS)
-        {
-            NRF_LOG_INFO("Read timing fail");
-            return;
-        }
-    }
-    else if(strcmp(cmd_func_str->cmd,"WAT")==0)
-    {
-        NRF_LOG_INFO("Set Wait Time");
-        err_code=tcs34725_set_wait_time(&tcs34725_instance,chartoint(cmd_func_str->data,3));
-        if(err_code!=NRF_SUCCESS)
-        {
-            NRF_LOG_INFO("Set wait time fail");
-            return;
-        }
-        tcs_cmd_str.reg_addr=TCS34725_REG_WAIT_TIME;
-        err_code=tcs34725_read_reg(&tcs34725_instance,&tcs_cmd_str,tcs34725_read_reg_cb);
-        if(err_code!=NRF_SUCCESS)
-        {
-            NRF_LOG_INFO("Read wait time fail");
-            return;
-        }
-    }
-    else if(strcmp(cmd_func_str->cmd,"GIN")==0)
-    {
-        NRF_LOG_INFO("Set gain");
-        err_code=tcs34725_set_gain(&tcs34725_instance,chartoint(cmd_func_str->data,3));
-        if(err_code!=NRF_SUCCESS)
-        {
-            NRF_LOG_INFO("Set gain fail");
-            return;
-        }
-        tcs_cmd_str.reg_addr=TCS34725_REG_CONTROL;
-        err_code=tcs34725_read_reg(&tcs34725_instance,&tcs_cmd_str,tcs34725_read_reg_cb);
-        if(err_code!=NRF_SUCCESS)
-        {
-            NRF_LOG_INFO("Read gain fail");
-            return;
-        }
-    }
-    else if(strcmp(cmd_func_str->cmd,"ENA")==0)
-    {
-        NRF_LOG_INFO("Set interrupt");
-        err_code=tcs34725_set_interrupt(&tcs34725_instance,chartoint(cmd_func_str->data,3));
-        if(err_code!=NRF_SUCCESS)
-        {
-            NRF_LOG_INFO("Set interrupt fail");
-            return;
-        }
-        tcs_cmd_str.reg_addr=TCS34725_REG_ENABLE;
-        err_code=tcs34725_read_reg(&tcs34725_instance,&tcs_cmd_str,tcs34725_read_reg_cb);
-        if(err_code!=NRF_SUCCESS)
-        {
-            NRF_LOG_INFO("Read interrupt fail");
-            return;
-        }
-    }
-    else if(strcmp(cmd_func_str->cmd,"WLO")==0)
-    {
-        NRF_LOG_INFO("Set wait long");
-        err_code=tcs34725_set_wait_long(&tcs34725_instance,chartoint(cmd_func_str->data,3));
-        if(err_code!=NRF_SUCCESS)
-        {
-            NRF_LOG_INFO("Set wait long fail");
-            return;
-        }
-        tcs_cmd_str.reg_addr=TCS34725_REG_CONFIG;
-        err_code=tcs34725_read_reg(&tcs34725_instance,&tcs_cmd_str,tcs34725_read_reg_cb);
-        if(err_code!=NRF_SUCCESS)
-        {
-            NRF_LOG_INFO("Read wait long fail");
-            return;
-        }
-    }
-    else if(strcmp(cmd_func_str->cmd,"PER")==0)
-    {
-        uint8_t persistence_val;
-        NRF_LOG_INFO("Set Persistence");
-        persistence_val=chartoint(cmd_func_str->data,3);
-        persistence_val=tcs34725_per_dectobin(persistence_val);
-        err_code=tcs34725_set_persistence(&tcs34725_instance,persistence_val);
-        if(err_code!=NRF_SUCCESS)
-        {
-            NRF_LOG_INFO("Set Persistence fail");
-            return;
-        }
-        tcs_cmd_str.reg_addr=TCS34725_REG_PERSISTENCE;
-        err_code=tcs34725_read_reg(&tcs34725_instance,&tcs_cmd_str,tcs34725_read_reg_cb);
-        if(err_code!=NRF_SUCCESS)
-        {
-            NRF_LOG_INFO("Read Persistence fail");
-            return;
-        }
-    }
-    else if(strcmp(cmd_func_str->cmd,"THL")==0)
-    {
-        NRF_LOG_INFO("Set Threshold Low");
-        err_code=tcs34725_set_threshold(&tcs34725_instance,TCS34725_THRESHOLD_LOW,chartoint(cmd_func_str->data,5));
-        if(err_code!=NRF_SUCCESS)
-        {
-            NRF_LOG_INFO("Set Threshold Low fail");
-            return;
-        }
-        err_code=tcs34725_read_threshold(&tcs34725_instance, TCS34725_THRESHOLD_LOW, tcs34725_read_thr_cb);
-        if(err_code!=NRF_SUCCESS)
-        {
-            NRF_LOG_INFO("Read Threshold Low fail");
-            return;
-        }
-    }
-    else if(strcmp(cmd_func_str->cmd,"THH")==0)
-    {
-        NRF_LOG_INFO("Set Threshold High");
-        err_code=tcs34725_set_threshold(&tcs34725_instance,TCS34725_THRESHOLD_HIGH,chartoint(cmd_func_str->data,5));
-        if(err_code!=NRF_SUCCESS)
-        {
-            NRF_LOG_INFO("Set Threshold High fail");
-            return;
-        }
-        err_code=tcs34725_read_threshold(&tcs34725_instance, TCS34725_THRESHOLD_HIGH, tcs34725_read_thr_cb);
-        if(err_code!=NRF_SUCCESS)
-        {
-            NRF_LOG_INFO("Read Threshold High fail");
-            return;
-        }
-    }
-    else
-    {
-        return;
-    }
-}
-
 static void tcs_read_all_reg_thread(void *arg)
 {
     #ifdef STACK_SIZE_CHK
@@ -1419,38 +1452,6 @@ static void ble_tcs_reg_send_thread(void *arg)
     }
 }
 
-/**@brief A function which is hooked to idle task.
- * @note Idle hook must be enabled in FreeRTOS configuration (configUSE_IDLE_HOOK).
- */
-void vApplicationIdleHook( void )
-{
-#if NRF_LOG_ENABLED
-     vTaskResume(m_logger_thread);
-#endif
-}
-
-/**@brief Function for initializing the clock.
- */
-static void clock_init(void)
-{
-    ret_code_t err_code = nrf_drv_clock_init();
-    APP_ERROR_CHECK(err_code);
-}
-
-#if NRF_LOG_ENABLED
-static void logger_thread(void * arg)
-{
-    UNUSED_PARAMETER(arg);
-
-    while (1)
-    {
-        NRF_LOG_FLUSH();
-
-        vTaskSuspend(NULL); // Suspend myself
-    }
-}
-#endif
-
 static void task_create_func(void)
 {
     
@@ -1595,8 +1596,6 @@ static void gpio_init(void)
     nrf_drv_gpiote_in_event_enable(TCS34725_INT_PIN, true);
 }
 
-
-
 int main(void)
 {
     ret_code_t err_code;
@@ -1624,6 +1623,7 @@ int main(void)
     queue_create_func();
     task_create_func();
     
+    //Set TCS34725 initialization value
     tcs34725_start();
 
     // Start execution.

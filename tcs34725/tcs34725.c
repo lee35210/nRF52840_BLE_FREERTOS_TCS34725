@@ -413,4 +413,3 @@ tcs34725_persistence_t tcs34725_per_dectobin(uint8_t dec_value)
     }
     return bin_value;
 }
-
