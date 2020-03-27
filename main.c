@@ -183,8 +183,10 @@ static QueueHandle_t m_tcs_reg_data_queue;
 static QueueHandle_t m_tcs_rgb_data_queue;
 static QueueHandle_t m_tcs_cmd_queue;
 
-void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str);
 static void tcs_read_all_reg_thread(void *arg);
+void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str);
+void tcs34725_read_reg_cb(ret_code_t result, tcs34725_reg_data_t * p_raw_data);
+void tcs34725_read_thr_cb(ret_code_t result, tcs34725_threshold_data_t * p_reg_data);
 
 #define STACK_SIZE_CHK  //For checking thread stack size
 
@@ -1222,12 +1224,12 @@ void tcs34725_rgbc_cb(ret_code_t result, tcs34725_rgbc_data_t * p_raw_data)
         NRF_LOG_INFO("TCS34725 RGBC register read fail");
         return;
     }
-  
+
     tcs_rgbc_cb_str.clear=p_raw_data->clear;
     tcs_rgbc_cb_str.red=(int)((double)p_raw_data->red/p_raw_data->clear*255);
     tcs_rgbc_cb_str.green=(int)((double)p_raw_data->green/p_raw_data->clear*255);
     tcs_rgbc_cb_str.blue=(int)((double)p_raw_data->blue/p_raw_data->clear*255);
-
+    
 //    printf("clear : %d, red : %d, blue : %d, green : %d\r\n",
 //            p_raw_data->clear,p_raw_data->red,p_raw_data->green,p_raw_data->blue);
 
