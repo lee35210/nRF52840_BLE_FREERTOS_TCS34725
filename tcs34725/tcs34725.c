@@ -292,3 +292,124 @@ ret_code_t tcs34725_set_interrupt(tcs34725_instance_t const * p_instance,
     }
     tcs34725_write_reg(p_instance, &enable_reg_str);
 }
+
+int tcs34725_per_bintodec(tcs34725_persistence_t bit_value)
+{
+    uint8_t dec_value;
+    switch(bit_value)
+    {
+        case TCS34725_OUT_OF_RANGE_0 :
+            dec_value=0;
+            break;
+        case TCS34725_OUT_OF_RANGE_1 :
+            dec_value=1;
+            break;
+        case TCS34725_OUT_OF_RANGE_2 :
+            dec_value=2;
+            break;
+        case TCS34725_OUT_OF_RANGE_3 :
+            dec_value=3;
+            break;
+        case TCS34725_OUT_OF_RANGE_5 :
+            dec_value=5;
+            break;
+        case TCS34725_OUT_OF_RANGE_10 :
+            dec_value=10;
+            break;
+        case TCS34725_OUT_OF_RANGE_15 :
+            dec_value=15;
+            break;
+        case TCS34725_OUT_OF_RANGE_20 :
+            dec_value=20;
+            break;
+        case TCS34725_OUT_OF_RANGE_25 :
+            dec_value=25;
+            break;
+        case TCS34725_OUT_OF_RANGE_30 :
+            dec_value=30;
+            break;
+        case TCS34725_OUT_OF_RANGE_35 :
+            dec_value=35;
+            break;
+        case TCS34725_OUT_OF_RANGE_40 :
+            dec_value=40;
+            break;
+        case TCS34725_OUT_OF_RANGE_45 :
+            dec_value=45;
+            break;
+        case TCS34725_OUT_OF_RANGE_50 :
+            dec_value=50;
+            break;
+        case TCS34725_OUT_OF_RANGE_55 :
+            dec_value=55;
+            break;
+        case TCS34725_OUT_OF_RANGE_60 :
+            dec_value=60;
+            break;
+        default :
+            dec_value=0;
+            break;
+    }
+    return dec_value;
+    
+}
+
+tcs34725_persistence_t tcs34725_per_dectobin(uint8_t dec_value)
+{
+    tcs34725_persistence_t bin_value;
+    switch(dec_value)
+    {
+        case 0 :
+            bin_value=TCS34725_OUT_OF_RANGE_0;
+            break;
+        case 1 :
+            bin_value=TCS34725_OUT_OF_RANGE_1;
+            break;
+        case 2 :
+            bin_value=TCS34725_OUT_OF_RANGE_2;
+            break;
+        case 3 :
+            bin_value=TCS34725_OUT_OF_RANGE_3;
+            break;
+        case 5 :
+            bin_value=TCS34725_OUT_OF_RANGE_5;
+            break;
+        case 10 :
+            bin_value=TCS34725_OUT_OF_RANGE_10;
+            break;
+        case 15 :
+            bin_value=TCS34725_OUT_OF_RANGE_15;
+            break;
+        case 20 :
+            bin_value=TCS34725_OUT_OF_RANGE_20;
+            break;
+        case 25 :
+            bin_value=TCS34725_OUT_OF_RANGE_25;
+            break;
+        case 30 :
+            bin_value=TCS34725_OUT_OF_RANGE_30;
+            break;
+        case 35 :
+            bin_value=TCS34725_OUT_OF_RANGE_35;
+            break;
+        case 40 :
+            bin_value=TCS34725_OUT_OF_RANGE_40;
+            break;
+        case 45 :
+            bin_value=TCS34725_OUT_OF_RANGE_45;
+            break;
+        case 50 :
+            bin_value=TCS34725_OUT_OF_RANGE_50;
+            break;
+        case 55 :
+            bin_value=TCS34725_OUT_OF_RANGE_55;
+            break;
+        case 60 :
+            bin_value=TCS34725_OUT_OF_RANGE_60;
+            break;
+        default :
+            bin_value=0;
+            break;
+    }
+    return bin_value;
+}

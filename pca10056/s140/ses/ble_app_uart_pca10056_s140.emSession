@@ -34,6 +34,7 @@
   <ProjectSessionItem path="ble_app_uart_tcs_pca10056_s140;ble_app_uart_tcs_pca10056_s140;Application"/>
   <ProjectSessionItem path="ble_app_uart_tcs_pca10056_s140;ble_app_uart_tcs_pca10056_s140;None"/>
   <ProjectSessionItem path="ble_app_uart_tcs_pca10056_s140;ble_app_uart_tcs_pca10056_s140;nRF_BLE_Services"/>
+  <ProjectSessionItem path="ble_app_uart_tcs_pca10056_s140;ble_app_uart_tcs_pca10056_s140;nRF_Drivers"/>
   <ProjectSessionItem path="ble_app_uart_tcs_pca10056_s140;ble_app_uart_tcs_pca10056_s140;nRF_Libraries"/>
   <ProjectSessionItem path="ble_app_uart_tcs_pca10056_s140;ble_app_uart_tcs_pca10056_s140;Segger Startup Files"/>
   <ProjectSessionItem path="ble_app_uart_tcs_pca10056_s140;ble_app_uart_tcs_pca10056_s140;TCS34725"/>
@@ -77,11 +78,11 @@
   <Watches active="0" update="Never"/>
  </Watch4>
  <Files>
-  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="1453" useTextEdit="1" useBinaryEdit="0" left="0" path="../../../main.c" selected="1" top="1431" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="129" useTextEdit="1" useBinaryEdit="0" left="0" path="../../../config/FreeRTOSConfig.h" selected="0" top="107" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="50" y="231" useTextEdit="1" useBinaryEdit="0" left="0" path="../../../tcs34725/tcs34725.c" selected="0" top="219" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="2" y="49" useTextEdit="1" useBinaryEdit="0" left="0" path="../../../tcs34725/tcs34725.h" selected="0" top="24" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="52" y="1779" useTextEdit="1" useBinaryEdit="0" left="0" path="../../../../../../external/freertos/source/include/task.h" selected="0" top="1760" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="39" y="1325" useTextEdit="1" useBinaryEdit="0" left="0" path="../../../main.c" selected="1" top="1289" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="1779" useTextEdit="1" useBinaryEdit="0" left="0" path="../../../../../../external/freertos/source/include/task.h" selected="0" top="1760" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="11" y="163" useTextEdit="1" useBinaryEdit="0" left="0" path="../../../tcs34725/tcs34725.c" selected="0" top="141" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="110" useTextEdit="1" useBinaryEdit="0" left="0" path="../../../tcs34725/tcs34725.h" selected="0" top="90" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="59" useTextEdit="1" useBinaryEdit="0" left="0" path="../../../tcs34725/tcs34725_internal.h" selected="0" top="37" codecName="Default"/>
  </Files>
  <ARMCrossStudioWindow activeProject="ble_app_uart_tcs_pca10056_s140" fileDialogDefaultFilter="*.c" autoConnectTarget="J-Link" buildConfiguration="Release" sessionSettings="" debugSearchFileMap="C:/Program Files/SEGGER/SEGGER Embedded Studio for ARM 4.42a/source/thumb_crt0.s&#xa;C:/Program Files/SEGGER/SEGGER Embedded Studio for ARM 4.50/source/thumb_crt0.s" fileDialogInitialDirectory="C:/Program Files/SEGGER/SEGGER Embedded Studio for ARM 4.50/source" debugSearchPath="" autoConnectCapabilities="3711"/>
 </session>

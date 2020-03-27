@@ -131,7 +131,7 @@ static ble_uuid_t m_adv_uuids[]          =                                      
  */
 #include "tcs34725.h"
 
-/** @mlx90614
+/** @tcs34725
  */
 #include "nrf_drv_clock.h"
 #include "app_error.h"
@@ -141,13 +141,14 @@ static ble_uuid_t m_adv_uuids[]          =                                      
 #include "math.h"
 #include "stdio.h"
 #include "nrf_delay.h"
-
+#include "nrf_drv_gpiote.h"
 #define TWI_INSTANCE_ID 0
 #define MAX_PENDING_TRANSACTIONS 20
 
 //TWI PIN
 #define TCS34725_SDA_PIN 28
 #define TCS34725_SCL_PIN 29
+#define TCS34725_INT_PIN 31
 
 //Macro that simplifies defining a TWI transaction manager instance.
 NRF_TWI_MNGR_DEF(m_nrf_twi_mngr, MAX_PENDING_TRANSACTIONS, TWI_INSTANCE_ID);
@@ -172,7 +173,6 @@ tcs34725_rgbc_data_t tcs34725_rgbc_str;
 #include "peer_manager_handler.h"
 #include "fds.h"
 
-static TaskHandle_t m_led_toggle_thread;
 static TaskHandle_t m_tcs_read_rgbc_thread;
 static TaskHandle_t m_ble_tcs_rgbc_send_thread;
 static TaskHandle_t m_tcs_reg_all_send_thread;
@@ -183,11 +183,10 @@ static QueueHandle_t m_tcs_reg_data_queue;
 static QueueHandle_t m_tcs_rgb_data_queue;
 static QueueHandle_t m_tcs_cmd_queue;
 
-typedef struct{
-    char cmd[4],data[6];
-}tcs34725_cmd_t;
-
 void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str);
+static void tcs_read_all_reg_thread(void *arg);
+
+#define STACK_SIZE_CHK  //For checking thread stack size
 
 #if NRF_LOG_ENABLED
 static TaskHandle_t m_logger_thread;                                /**< Definition of Logger thread. */
@@ -330,11 +329,22 @@ static void nus_data_handler(ble_nus_evt_t * p_evt)
         {
             memcpy(nus_cmd_str.data,&p_evt->params.rx_data.p_data[3],5);
         }
-        if(pdPASS!=xQueueSend(m_tcs_cmd_queue,&nus_cmd_str,10))
+        
+        if(uxQueueSpacesAvailable(m_tcs_cmd_queue)!=0)
         {
-            NRF_LOG_INFO("NUS DATA HANLDER : QUEUE SEND FAIL");
+            if(pdPASS!=xQueueSend(m_tcs_cmd_queue,&nus_cmd_str,10))
+            {
+                NRF_LOG_INFO("NUS DATA HANLDER : Queue send fail");
+            }
+            xTaskNotifyGive(m_tcs_wr_reg_thread);
         }
-        xTaskNotifyGive(m_tcs_wr_reg_thread);
+        else
+        {
+            if(pdPASS!=xQueueOverwrite(m_tcs_cmd_queue,&nus_cmd_str));
+            {
+                NRF_LOG_INFO("NUS DATA HANLDER : Queue overwrite fail");
+            }
+        }
     }
 
 }
@@ -879,148 +889,39 @@ static void twi_config(void)
     APP_ERROR_CHECK(err_code);
 }
 
-
-
-
-/*@Callback
+/**@brief A function which is hooked to idle task.
+ * @note Idle hook must be enabled in FreeRTOS configuration (configUSE_IDLE_HOOK).
  */
-
-typedef struct{
-    char send_data[9];
-}tcs34725_ble_reg_t;
-
-void tcs34725_read_reg_cb(ret_code_t result, tcs34725_reg_data_t * p_raw_data)
+void vApplicationIdleHook( void )
 {
-    char read_reg_cb_cmd[]="CMD";
-
-    if(result!=NRF_SUCCESS)
-    {
-        NRF_LOG_INFO("TCS34725 register read fail");
-        return;
-    }
-    p_raw_data->reg_addr&=0x1F;
-    
-    switch(p_raw_data->reg_addr)
-    {
-        case TCS34725_REG_ENABLE :
-            NRF_LOG_INFO("Enable register : %X",p_raw_data->reg_data);
-            strcpy(read_reg_cb_cmd,"ENA");
-            break;
-        case TCS34725_REG_TIMING :
-            NRF_LOG_INFO("Timing register : %X",p_raw_data->reg_data);
-            strcpy(read_reg_cb_cmd,"TIM");
-            p_raw_data->reg_data=256-p_raw_data->reg_data;
-            break;
-        case TCS34725_REG_WAIT_TIME :
-            NRF_LOG_INFO("Wait time register : %X",p_raw_data->reg_data);
-            strcpy(read_reg_cb_cmd,"WAT");
-            p_raw_data->reg_data=256-p_raw_data->reg_data;
-            break;
-        case TCS34725_REG_PERSISTENCE :
-            NRF_LOG_INFO("Persistence register : %X",p_raw_data->reg_data);
-            strcpy(read_reg_cb_cmd,"PER");
-            break;
-        case TCS34725_REG_CONFIG :
-            NRF_LOG_INFO("Configuration register : %X",p_raw_data->reg_data);
-            strcpy(read_reg_cb_cmd,"WLO");
-            break;
-        case TCS34725_REG_CONTROL :
-            NRF_LOG_INFO("Control register : %X",p_raw_data->reg_data);
-            strcpy(read_reg_cb_cmd,"GIN");
-            break;
-        case TCS34725_REG_ID :
-            NRF_LOG_INFO("ID register : %X",p_raw_data->reg_data);
-            strcpy(read_reg_cb_cmd,"IDR");
-            break;
-        case TCS34725_REG_STATUS :
-            NRF_LOG_INFO("Status register : %X",p_raw_data->reg_data);
-            strcpy(read_reg_cb_cmd,"STA");
-            break;
-        default :
-            break;
-    }
-
-    tcs34725_ble_reg_t tcs_ble_send_str;
-    sprintf(tcs_ble_send_str.send_data,"%s%3d",read_reg_cb_cmd,p_raw_data->reg_data);
-  
-    if(pdTRUE!=xQueueSend(m_tcs_reg_data_queue, &tcs_ble_send_str, 10))
-    {
-        printf("xQueue send fail\r\n");
-    }
-    xTaskNotifyGive(m_ble_tcs_reg_send_thread);
+#if NRF_LOG_ENABLED
+     vTaskResume(m_logger_thread);
+#endif
 }
 
-void tcs34725_read_thr_cb(ret_code_t result, tcs34725_threshold_data_t * p_reg_data)
+/**@brief Function for initializing the clock.
+ */
+static void clock_init(void)
 {
-    if(result!=NRF_SUCCESS)
-    {
-        NRF_LOG_INFO("TCS34725 register read fail");
-        return;
-    }
-
-    char read_thr_cb_cmd[]="CMD";
-
-    printf("thr cb : %X %d\r\n",p_reg_data->reg_addr,p_reg_data->threshold_data);
-
-    switch(p_reg_data->reg_addr)
-    {
-        case TCS34725_REG_THRESHOLD_LOW_L :
-            break;
-        case TCS34725_REG_THRESHOLD_HIGH_L :
-            break;
-        default :
-            break;
-    }
-
-    if(p_reg_data->reg_addr==TCS34725_REG_THRESHOLD_LOW_L)
-    {
-        NRF_LOG_INFO("Threshold Low value : %d",p_reg_data->threshold_data);
-        strcpy(read_thr_cb_cmd,"THL");
-
-    }
-    else
-    {
-        NRF_LOG_INFO("Threshold High value : %d",p_reg_data->threshold_data);
-        strcpy(read_thr_cb_cmd,"THH");
-    }
-
-    tcs34725_ble_reg_t tcs_ble_send_str;
-    sprintf(tcs_ble_send_str.send_data,"%s%5d",read_thr_cb_cmd,p_reg_data->threshold_data);
-  
-    if(pdTRUE!=xQueueSend(m_tcs_reg_data_queue, &tcs_ble_send_str, 10))
-    {
-        printf("xQueue send fail\r\n");
-    }
-    xTaskNotifyGive(m_ble_tcs_reg_send_thread);
+    ret_code_t err_code = nrf_drv_clock_init();
+    APP_ERROR_CHECK(err_code);
 }
 
-void tcs34725_rgbc_cb(ret_code_t result, tcs34725_rgbc_data_t * p_raw_data)
+/*@Threads
+ */
+#if NRF_LOG_ENABLED
+static void logger_thread(void * arg)
 {
-    tcs34725_rgbc_data_t tcs_rgbc_cb_str;
+    UNUSED_PARAMETER(arg);
 
-    if(result!=NRF_SUCCESS)
+    while (1)
     {
-        NRF_LOG_INFO("tcs rgbc callback failed");
-        return;
-    }
-  
-    tcs_rgbc_cb_str.clear=p_raw_data->clear;
-    tcs_rgbc_cb_str.red=(int)((double)p_raw_data->red/p_raw_data->clear*255);
-    tcs_rgbc_cb_str.green=(int)((double)p_raw_data->green/p_raw_data->clear*255);
-    tcs_rgbc_cb_str.blue=(int)((double)p_raw_data->blue/p_raw_data->clear*255);
+        NRF_LOG_FLUSH();
 
-//    printf("clear : %d, red : %d, blue : %d, green : %d\r\n",
-//            p_raw_data->clear,p_raw_data->red,p_raw_data->green,p_raw_data->blue);
-
-    if(pdTRUE!=xQueueSend(m_tcs_rgb_data_queue, &tcs_rgbc_cb_str, 10))
-    {
-        printf("xQueue send fail\r\n");
+        vTaskSuspend(NULL); // Suspend myself
     }
-    xTaskNotifyGive(m_ble_tcs_rgbc_send_thread);
-    xTaskNotify(m_ble_tcs_rgbc_send_thread, 1, eSetValueWithOverwrite);
 }
-
-
+#endif
 
 /**@brief Application main function.
  */
@@ -1035,54 +936,11 @@ int chartoint(char *char_value, uint8_t length)
     return int_val;
 }
 
-static void tcs_read_all_reg_thread(void *arg)
-{
-    static tcs34725_reg_data_t enable,timing,waittime,persistence,config,control,id,status;
-
-    while(1)
-    {
-        enable.reg_addr=TCS34725_REG_ENABLE;
-        tcs34725_read_reg(&tcs34725_instance, &enable, tcs34725_read_reg_cb);
-        vTaskDelay(10);
-
-        timing.reg_addr=TCS34725_REG_TIMING;
-        tcs34725_read_reg(&tcs34725_instance, &timing, tcs34725_read_reg_cb);
-        vTaskDelay(10);
-        
-        waittime.reg_addr=TCS34725_REG_WAIT_TIME;
-        tcs34725_read_reg(&tcs34725_instance, &waittime, tcs34725_read_reg_cb);
-        vTaskDelay(10);
-        
-        persistence.reg_addr=TCS34725_REG_PERSISTENCE;
-        tcs34725_read_reg(&tcs34725_instance, &persistence, tcs34725_read_reg_cb);
-        vTaskDelay(10);
-        
-        config.reg_addr=TCS34725_REG_CONFIG;
-        tcs34725_read_reg(&tcs34725_instance, &config, tcs34725_read_reg_cb);
-        vTaskDelay(10);
-        
-        control.reg_addr=TCS34725_REG_CONTROL;
-        tcs34725_read_reg(&tcs34725_instance, &control, tcs34725_read_reg_cb);
-        vTaskDelay(10);
-        
-        id.reg_addr=TCS34725_REG_ID;
-        tcs34725_read_reg(&tcs34725_instance, &id, tcs34725_read_reg_cb);
-        vTaskDelay(10);
-        
-        status.reg_addr=TCS34725_REG_STATUS;
-        tcs34725_read_reg(&tcs34725_instance, &status, tcs34725_read_reg_cb);
-        vTaskDelay(10);
-        
-        vTaskDelete(m_tcs_reg_all_send_thread);
-    }
-}
-
 void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
 {
     static tcs34725_reg_data_t tcs_cmd_str;
     ret_code_t err_code;
 
-    printf("cmd func : %s %s\r\n",cmd_func_str->cmd,cmd_func_str->data);
     if(strcmp(cmd_func_str->cmd,"RAR")==0)
     {
         if(pdPASS!=xTaskCreate(tcs_read_all_reg_thread, "TCS_READ_ALL_REG", configMINIMAL_STACK_SIZE+30,
@@ -1176,6 +1034,26 @@ void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
             return;
         }
     }
+    else if(strcmp(cmd_func_str->cmd,"PER")==0)
+    {
+        uint8_t persistence_val;
+        NRF_LOG_INFO("Set Persistence");
+        persistence_val=chartoint(cmd_func_str->data,3);
+        persistence_val=tcs34725_per_dectobin(persistence_val);
+        err_code=tcs34725_set_persistence(&tcs34725_instance,persistence_val);
+        if(err_code!=NRF_SUCCESS)
+        {
+            NRF_LOG_INFO("Set Persistence fail");
+            return;
+        }
+        tcs_cmd_str.reg_addr=TCS34725_REG_PERSISTENCE;
+        err_code=tcs34725_read_reg(&tcs34725_instance,&tcs_cmd_str,tcs34725_read_reg_cb);
+        if(err_code!=NRF_SUCCESS)
+        {
+            NRF_LOG_INFO("Read Persistence fail");
+            return;
+        }
+    }
     else if(strcmp(cmd_func_str->cmd,"THL")==0)
     {
         NRF_LOG_INFO("Set Threshold Low");
@@ -1210,76 +1088,307 @@ void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
     }
     else
     {
+        return;
     }
 }
 
+/*@Callback
+ */
+void tcs34725_read_reg_cb(ret_code_t result, tcs34725_reg_data_t * p_raw_data)
+{
+    char read_reg_cb_cmd[]="CMD";
+    uint8_t persistence_value;
+
+    if(result!=NRF_SUCCESS)
+    {
+        NRF_LOG_INFO("TCS34725 register read fail");
+        return;
+    }
+    p_raw_data->reg_addr&=0x1F;
+    
+    switch(p_raw_data->reg_addr)
+    {
+        case TCS34725_REG_ENABLE :
+            NRF_LOG_INFO("Enable register : %X",p_raw_data->reg_data);
+            strcpy(read_reg_cb_cmd,"ENA");
+            break;
+        case TCS34725_REG_TIMING :
+            NRF_LOG_INFO("Timing register : %X",p_raw_data->reg_data);
+            strcpy(read_reg_cb_cmd,"TIM");
+            p_raw_data->reg_data=256-p_raw_data->reg_data;
+            break;
+        case TCS34725_REG_WAIT_TIME :
+            NRF_LOG_INFO("Wait time register : %X",p_raw_data->reg_data);
+            strcpy(read_reg_cb_cmd,"WAT");
+            p_raw_data->reg_data=256-p_raw_data->reg_data;
+            break;
+        case TCS34725_REG_PERSISTENCE :
+            NRF_LOG_INFO("Persistence register : %X",p_raw_data->reg_data);
+            strcpy(read_reg_cb_cmd,"PER");
+            persistence_value=p_raw_data->reg_data;
+            persistence_value=tcs34725_per_bintodec(persistence_value);
+            p_raw_data->reg_data=persistence_value;
+            break;
+        case TCS34725_REG_CONFIG :
+            NRF_LOG_INFO("Configuration register : %X",p_raw_data->reg_data);
+            strcpy(read_reg_cb_cmd,"WLO");
+            break;
+        case TCS34725_REG_CONTROL :
+            NRF_LOG_INFO("Control register : %X",p_raw_data->reg_data);
+            strcpy(read_reg_cb_cmd,"GIN");
+            break;
+        case TCS34725_REG_ID :
+            NRF_LOG_INFO("ID register : %X",p_raw_data->reg_data);
+            strcpy(read_reg_cb_cmd,"IDR");
+            break;
+        case TCS34725_REG_STATUS :
+            NRF_LOG_INFO("Status register : %X",p_raw_data->reg_data);
+            strcpy(read_reg_cb_cmd,"STA");
+            break;
+        default :
+            break;
+    }
+
+    tcs34725_ble_reg_t tcs_ble_send_str;
+    sprintf(tcs_ble_send_str.send_data,"%s%3d",read_reg_cb_cmd,p_raw_data->reg_data);
+  
+    if(uxQueueSpacesAvailable(m_tcs_reg_data_queue)!=0)
+    {
+        if(pdPASS!=xQueueSend(m_tcs_reg_data_queue,&tcs_ble_send_str,10))
+        {
+            NRF_LOG_INFO("TCS34725 READ REG CB : Queue send fail");
+        }
+        xTaskNotifyGive(m_ble_tcs_reg_send_thread);
+    }
+    else
+    {
+        if(pdPASS!=xQueueOverwrite(m_tcs_reg_data_queue,&tcs_ble_send_str))
+        {
+            NRF_LOG_INFO("TCS34725 READ REG CB : Queue overwrite fail");
+        }
+    }
+    
+}
+
+void tcs34725_read_thr_cb(ret_code_t result, tcs34725_threshold_data_t * p_reg_data)
+{
+    if(result!=NRF_SUCCESS)
+    {
+        NRF_LOG_INFO("TCS34725 Threshold register read fail");
+        return;
+    }
+
+    char read_thr_cb_cmd[]="CMD";
+
+    if(p_reg_data->reg_addr==TCS34725_REG_THRESHOLD_LOW_L)
+    {
+        NRF_LOG_INFO("Threshold Low value : %d",p_reg_data->threshold_data);
+        strcpy(read_thr_cb_cmd,"THL");
+
+    }
+    else
+    {
+        NRF_LOG_INFO("Threshold High value : %d",p_reg_data->threshold_data);
+        strcpy(read_thr_cb_cmd,"THH");
+    }
+
+    tcs34725_ble_reg_t tcs_ble_send_str;
+    sprintf(tcs_ble_send_str.send_data,"%s%5d",read_thr_cb_cmd,p_reg_data->threshold_data);
+
+    if(uxQueueSpacesAvailable(m_tcs_reg_data_queue)!=0)
+    {
+        if(pdPASS!=xQueueSend(m_tcs_reg_data_queue,&tcs_ble_send_str,10))
+        {
+            NRF_LOG_INFO("TCS34725 THRESHOLD CB : Queue send fail\r\n");
+        }
+        xTaskNotifyGive(m_ble_tcs_reg_send_thread);
+    }
+    else
+    {
+        if(pdPASS!=xQueueOverwrite(m_tcs_reg_data_queue,&tcs_ble_send_str))
+        {
+            NRF_LOG_INFO("TCS34725 THRESHOLD CB : Queue overwrite fail\r\n");
+        }
+    }
+    
+}
+
+void tcs34725_rgbc_cb(ret_code_t result, tcs34725_rgbc_data_t * p_raw_data)
+{
+    tcs34725_rgbc_data_t tcs_rgbc_cb_str;
+
+    if(result!=NRF_SUCCESS)
+    {
+        NRF_LOG_INFO("TCS34725 RGBC register read fail");
+        return;
+    }
+  
+    tcs_rgbc_cb_str.clear=p_raw_data->clear;
+    tcs_rgbc_cb_str.red=(int)((double)p_raw_data->red/p_raw_data->clear*255);
+    tcs_rgbc_cb_str.green=(int)((double)p_raw_data->green/p_raw_data->clear*255);
+    tcs_rgbc_cb_str.blue=(int)((double)p_raw_data->blue/p_raw_data->clear*255);
+
+//    printf("clear : %d, red : %d, blue : %d, green : %d\r\n",
+//            p_raw_data->clear,p_raw_data->red,p_raw_data->green,p_raw_data->blue);
+
+    if(uxQueueSpacesAvailable(m_tcs_rgb_data_queue)!=0)
+    {
+        if(pdTRUE!=xQueueSend(m_tcs_rgb_data_queue, &tcs_rgbc_cb_str, 10))
+        {
+            NRF_LOG_INFO("TCS34725 RGBC CB : Queue send fail\r\n");
+        }
+        xTaskNotifyGive(m_ble_tcs_rgbc_send_thread);
+    }
+    else
+    {
+        if(pdTRUE!=xQueueOverwrite(m_tcs_rgb_data_queue, &tcs_rgbc_cb_str))
+        {
+            NRF_LOG_INFO("TCS34725 RGBC CB : Queue overwrite fail\r\n");
+        }
+    }
+}
+
+/* Thread
+ */
+static void tcs_read_all_reg_thread(void *arg)
+{
+    #ifdef STACK_SIZE_CHK
+    configSTACK_DEPTH_TYPE uxHighWaterMark2;
+    uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
+    uint8_t stack_left=255;
+    #endif
+
+    static tcs34725_reg_data_t enable,timing,waittime,persistence,config,control,id,status;
+    static tcs34725_threshold_data_t th_low,th_high;
+
+    while(1)
+    {
+        enable.reg_addr=TCS34725_REG_ENABLE;
+        tcs34725_read_reg(&tcs34725_instance, &enable, tcs34725_read_reg_cb);
+        vTaskDelay(10);
+
+        timing.reg_addr=TCS34725_REG_TIMING;
+        tcs34725_read_reg(&tcs34725_instance, &timing, tcs34725_read_reg_cb);
+        vTaskDelay(10);
+        
+        waittime.reg_addr=TCS34725_REG_WAIT_TIME;
+        tcs34725_read_reg(&tcs34725_instance, &waittime, tcs34725_read_reg_cb);
+        vTaskDelay(10);
+        
+        persistence.reg_addr=TCS34725_REG_PERSISTENCE;
+        tcs34725_read_reg(&tcs34725_instance, &persistence, tcs34725_read_reg_cb);
+        vTaskDelay(10);
+        
+        config.reg_addr=TCS34725_REG_CONFIG;
+        tcs34725_read_reg(&tcs34725_instance, &config, tcs34725_read_reg_cb);
+        vTaskDelay(10);
+        
+        control.reg_addr=TCS34725_REG_CONTROL;
+        tcs34725_read_reg(&tcs34725_instance, &control, tcs34725_read_reg_cb);
+        vTaskDelay(10);
+        
+        id.reg_addr=TCS34725_REG_ID;
+        tcs34725_read_reg(&tcs34725_instance, &id, tcs34725_read_reg_cb);
+        vTaskDelay(10);
+        
+        status.reg_addr=TCS34725_REG_STATUS;
+        tcs34725_read_reg(&tcs34725_instance, &status, tcs34725_read_reg_cb);
+        vTaskDelay(10);
+
+        th_low.reg_addr=TCS34725_REG_THRESHOLD_LOW_L;
+        tcs34725_read_threshold(&tcs34725_instance, TCS34725_THRESHOLD_LOW, tcs34725_read_thr_cb);
+        vTaskDelay(10);
+
+        th_high.reg_addr=TCS34725_REG_THRESHOLD_HIGH_L;
+        tcs34725_read_threshold(&tcs34725_instance, TCS34725_THRESHOLD_HIGH, tcs34725_read_thr_cb);
+        
+        #ifdef STACK_SIZE_CHK
+        uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
+        if(uxHighWaterMark2<stack_left)
+        {
+            stack_left=uxHighWaterMark2;
+            printf("TCS all read stack left : %d\r\n",stack_left);
+        }
+        #endif
+
+        vTaskDelete(m_tcs_reg_all_send_thread);
+    }
+}
 
 static void tcs_wr_reg_thread(void *arg)
 {
-//    configSTACK_DEPTH_TYPE uxHighWaterMark2;
-//    uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
+    #ifdef STACK_SIZE_CHK
+    configSTACK_DEPTH_TYPE uxHighWaterMark2;
+    uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
+    uint8_t stack_left=255;
+    #endif
 
     ret_code_t err_code;
     tcs34725_cmd_t wr_cmd_str;
-    tcs34725_reg_data_t wr_reg_str;
 
     while(1)
     {
         if((ulTaskNotifyTake(pdTRUE,10)!=0)&&(pdPASS==xQueueReceive(m_tcs_cmd_queue,&wr_cmd_str,10)))
         {
-            printf("wr reg : %s\r\n",wr_cmd_str.cmd);
             tcs34725_cmd_func(&wr_cmd_str);
         }
-        vTaskDelay(1000);
-//        uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
-//        printf("TCS WR STACK SIZE LEFT : %d\r\n",uxHighWaterMark2);
-    }
-}
+        vTaskDelay(100);
 
-static void led_toggle_thread(void * pvParameter)
-{
-    configSTACK_DEPTH_TYPE uxHighWaterMark2;
-    uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
-
-    UNUSED_PARAMETER(pvParameter);
-    while (true)
-    {
-        bsp_board_led_invert(BSP_BOARD_LED_0);
-        vTaskDelay(1000);
+        #ifdef STACK_SIZE_CHK
         uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
-//        printf("LED : %d\r\n",uxHighWaterMark2);
+        if(uxHighWaterMark2<stack_left)
+        {
+            stack_left=uxHighWaterMark2;
+            printf("TCS WR STACK LEFT : %d\r\n",uxHighWaterMark2);
+        }
+        #endif
     }
 }
 
 static void tcs_read_rgbc_thread(void *arg)
 {
+    #ifdef STACK_SIZE_CHK
+    configSTACK_DEPTH_TYPE uxHighWaterMark2;
+    uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
+    uint8_t stack_left=255;
+    #endif
+
     tcs34725_rgbc_data_t tcs_rgbc_thread;
+    
     while(1)
     {
         tcs34725_read_rgbc(&tcs34725_instance,&tcs_rgbc_thread,tcs34725_rgbc_cb);
-        vTaskDelay(5000);
+        vTaskDelay(200);
+
+        #ifdef STACK_SIZE_CHK
+        uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
+        if(uxHighWaterMark2<stack_left)
+        {
+            stack_left=uxHighWaterMark2;
+            printf("RGBC read stack left : %d\r\n",uxHighWaterMark2);
+        }
+        #endif
     }
 }
 
 static void ble_tcs_rgbc_send_thread(void *arg)
 {
+    #ifdef STACK_SIZE_CHK
+    configSTACK_DEPTH_TYPE uxHighWaterMark2;
+    uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
+    uint8_t stack_left=255;
+    #endif
+
     ret_code_t err_code;
     tcs34725_rgbc_data_t ble_tcs_send_rgb;
     char data_array[18]={};
     uint16_t length=sizeof(data_array);
 
-    configSTACK_DEPTH_TYPE uxHighWaterMark2;
-    uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
-
     while(1)
     {
-        if(ulTaskNotifyTake(pdTRUE,10)!=0)
+        if((ulTaskNotifyTake(pdTRUE,10)!=0)&&
+          (pdPASS==xQueueReceive(m_tcs_rgb_data_queue, &ble_tcs_send_rgb, 10)))
         {
-            if(pdPASS!=xQueueReceive(m_tcs_rgb_data_queue, &ble_tcs_send_rgb, 10))
-            {
-                //fail
-            }
-
             sprintf(data_array,"RGB%5d%3d%3d%3d",ble_tcs_send_rgb.clear,ble_tcs_send_rgb.red,ble_tcs_send_rgb.green,
                     ble_tcs_send_rgb.blue);
             if(m_conn_handle!=BLE_CONN_HANDLE_INVALID)
@@ -1292,30 +1401,34 @@ static void ble_tcs_rgbc_send_thread(void *arg)
                     APP_ERROR_CHECK(err_code);
                 }
             }
-//            uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
-//            printf("BLE UART : %d\r\n",uxHighWaterMark2);
+            #ifdef STACK_SIZE_CHK
+            uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
+            if(uxHighWaterMark2<stack_left)
+            {
+                stack_left=uxHighWaterMark2;
+                printf("BLE rgbc send stack left : %d\r\n",uxHighWaterMark2);
+            }
+            #endif
         }
     }
 }
 
 static void ble_tcs_reg_send_thread(void *arg)
 {
+    #ifdef STACK_SIZE_CHK
+    configSTACK_DEPTH_TYPE uxHighWaterMark2;
+    uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
+    uint8_t stack_left=255;
+    #endif
+
     ret_code_t err_code;
     tcs34725_ble_reg_t ble_tcs_send_reg;
     uint16_t length=sizeof(ble_tcs_send_reg);
 
-//    configSTACK_DEPTH_TYPE uxHighWaterMark2;
-//    uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
-
     while(1)
     {
-        if(ulTaskNotifyTake(pdTRUE,10)!=0)
+        if((ulTaskNotifyTake(pdFALSE,10)!=0)&&(pdPASS==xQueueReceive(m_tcs_reg_data_queue, &ble_tcs_send_reg, 10)))
         {
-            if(pdPASS!=xQueueReceive(m_tcs_reg_data_queue, &ble_tcs_send_reg, 10))
-            {
-                //fail
-            }
-            printf("ble reg : %s\r\n",ble_tcs_send_reg.send_data);
             if(m_conn_handle!=BLE_CONN_HANDLE_INVALID)
             {
                 err_code=ble_nus_data_send(&m_nus, ble_tcs_send_reg.send_data, &length, m_conn_handle);
@@ -1326,81 +1439,61 @@ static void ble_tcs_reg_send_thread(void *arg)
                     APP_ERROR_CHECK(err_code);
                 }
             }
-//            uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
-//            printf("BLE UART : %d\r\n",uxHighWaterMark2);
+
+            #ifdef STACK_SIZE_CHK
+            uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
+            if(uxHighWaterMark2<stack_left)
+            {
+                stack_left=uxHighWaterMark2;
+                printf("BLE reg send stack left : %d\r\n",uxHighWaterMark2);
+            }
+            #endif
         }
     }
 }
 
-/**@brief A function which is hooked to idle task.
- * @note Idle hook must be enabled in FreeRTOS configuration (configUSE_IDLE_HOOK).
- */
-void vApplicationIdleHook( void )
-{
-#if NRF_LOG_ENABLED
-     vTaskResume(m_logger_thread);
-#endif
-}
-
-/**@brief Function for initializing the clock.
- */
-static void clock_init(void)
-{
-    ret_code_t err_code = nrf_drv_clock_init();
-    APP_ERROR_CHECK(err_code);
-}
-
-#if NRF_LOG_ENABLED
-static void logger_thread(void * arg)
-{
-    UNUSED_PARAMETER(arg);
-
-    while (1)
-    {
-        NRF_LOG_FLUSH();
-
-        vTaskSuspend(NULL); // Suspend myself
-    }
-}
-#endif
-
 static void task_create_func(void)
 {
     
-    if(pdPASS!=xTaskCreate(tcs_read_rgbc_thread, "TCS_RGBC_READ", configMINIMAL_STACK_SIZE+30, 
+    if(pdPASS!=xTaskCreate(tcs_read_rgbc_thread, "TCS_RGBC_READ", configMINIMAL_STACK_SIZE+60, 
                            NULL, 3, &m_tcs_read_rgbc_thread))
     {
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
     }
 
-    if(pdPASS!=xTaskCreate(tcs_wr_reg_thread, "TCS_WR_REG", configMINIMAL_STACK_SIZE+100, 
+    if(pdPASS!=xTaskCreate(tcs_wr_reg_thread, "TCS_WR_REG", configMINIMAL_STACK_SIZE+160, 
                            NULL, 3, &m_tcs_wr_reg_thread))
     {
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
     }
-    if(pdPASS!=xTaskCreate(ble_tcs_rgbc_send_thread, "TCS_RGBC_BLE_SEND", configMINIMAL_STACK_SIZE+30, 
+    if(pdPASS!=xTaskCreate(ble_tcs_rgbc_send_thread, "TCS_RGBC_BLE_SEND", configMINIMAL_STACK_SIZE+60, 
                            NULL, 3, &m_ble_tcs_rgbc_send_thread))
     {
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
     }
 
-    if(pdPASS!=xTaskCreate(ble_tcs_reg_send_thread, "TCS_REG_BLE_SEND", configMINIMAL_STACK_SIZE+30,
+    if(pdPASS!=xTaskCreate(ble_tcs_reg_send_thread, "TCS_REG_BLE_SEND", configMINIMAL_STACK_SIZE+60,
                            NULL, 3, &m_ble_tcs_reg_send_thread))
     {
         APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
     }
-//#if NRF_LOG_ENABLED
-//    if (pdPASS!=xTaskCreate(logger_thread, "LOGGER", configMINIMAL_STACK_SIZE+60, NULL, 1, &m_logger_thread))
-//    {
-//        APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
-//    }
-//#endif
+#if NRF_LOG_ENABLED
+    if (pdPASS!=xTaskCreate(logger_thread, "LOGGER", configMINIMAL_STACK_SIZE+250, NULL, 1, &m_logger_thread))
+    {
+        APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
+    }
+#endif
 }
 
 static void queue_create_func(void)
 {
-    m_tcs_reg_data_queue=xQueueCreate(8,sizeof(tcs34725_ble_reg_t));
+    //handling data read from TCS34725 RGBC register
     m_tcs_rgb_data_queue=xQueueCreate(1,sizeof(tcs34725_rgbc_data_t));
+    
+    //handling data read from TCS34725 register
+    m_tcs_reg_data_queue=xQueueCreate(8,sizeof(tcs34725_ble_reg_t));
+    
+    //handling data receive from ble uart
     m_tcs_cmd_queue=xQueueCreate(8, sizeof(tcs34725_cmd_t));
 }
 
@@ -1414,17 +1507,20 @@ void tcs34725_start()
     err_code=tcs34725_set_timing(&tcs34725_instance, 150);  //1~256
     APP_ERROR_CHECK(err_code);
 
-    err_code=tcs34725_set_wait_time(&tcs34725_instance, 80);   //1~256
-    APP_ERROR_CHECK(err_code);
-
-    err_code=tcs34725_set_persistence(&tcs34725_instance, TCS34725_OUT_OF_RANGE_3);
-    APP_ERROR_CHECK(err_code);
-
-    err_code=tcs34725_set_gain(&tcs34725_instance, TCS34725_GAIN_x60);
+    err_code=tcs34725_set_wait_time(&tcs34725_instance, 50);   //1~256
     APP_ERROR_CHECK(err_code);
 
 //    err_code=tcs34725_set_wait_long(&tcs34725_instance, TCS34725_WAIT_LONG_ENABLE);
 //    APP_ERROR_CHECK(err_code);
+
+    err_code=tcs34725_set_gain(&tcs34725_instance, TCS34725_GAIN_60x);
+    APP_ERROR_CHECK(err_code);
+
+//    err_code=tcs34725_set_interrupt(&tcs34725_instance, TCS34725_INTERRUPT_ENABLE);
+//    APP_ERROR_CHECK(err_code);
+    
+    err_code=tcs34725_set_persistence(&tcs34725_instance, TCS34725_OUT_OF_RANGE_60);
+    APP_ERROR_CHECK(err_code);
 
     err_code=tcs34725_set_threshold(&tcs34725_instance, TCS34725_THRESHOLD_LOW, 10000);
     APP_ERROR_CHECK(err_code);
@@ -1446,6 +1542,60 @@ void tcs34725_read_config()
     APP_ERROR_CHECK(err_code);
 }
 
+
+void in_pin_handler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action)
+{
+    if(pin==TCS34725_INT_PIN)
+    {
+        ret_code_t err_code;
+        int queue_space;
+
+        NRF_LOG_INFO("TCS34725 RGBC Interrupt occured");
+
+        static tcs34725_ble_reg_t tcs_int_alarm={0};
+        strcpy(tcs_int_alarm.send_data,"INT");
+        
+        err_code=tcs34725_int_clear(&tcs34725_instance);
+        APP_ERROR_CHECK(err_code);
+        if(err_code==NRF_SUCCESS)
+        {
+            NRF_LOG_INFO("TCS34725 Clear channel interrupt clear");
+        }
+        
+        if(uxQueueSpacesAvailable(m_tcs_reg_data_queue)!=0)
+        {
+            if(pdPASS!=xQueueSend(m_tcs_reg_data_queue,&tcs_int_alarm,10))
+            {
+                NRF_LOG_INFO("Interrupt queue send fail");
+            }
+            xTaskNotifyGive(m_ble_tcs_reg_send_thread);
+        }
+        else
+        {
+            if(pdPASS!=xQueueOverwrite(m_tcs_reg_data_queue,&tcs_int_alarm))
+            {
+                NRF_LOG_INFO("Interrupt queue overwrite fail");
+            }
+        }
+    }
+}
+
+static void gpio_init(void)
+{
+    ret_code_t err_code;
+
+    err_code = nrf_drv_gpiote_init();
+    APP_ERROR_CHECK(err_code);
+
+    nrf_drv_gpiote_in_config_t in_config = GPIOTE_CONFIG_IN_SENSE_HITOLO(true);
+    in_config.pull = NRF_GPIO_PIN_PULLUP;
+
+    err_code = nrf_drv_gpiote_in_init(TCS34725_INT_PIN, &in_config, in_pin_handler);
+    APP_ERROR_CHECK(err_code);
+
+    nrf_drv_gpiote_in_event_enable(TCS34725_INT_PIN, true);
+}
+
 int main(void)
 {
     ret_code_t err_code;
@@ -1456,6 +1606,7 @@ int main(void)
     bsp_board_init(BSP_INIT_LEDS);
     clock_init();
     timers_init();
+    gpio_init();
     power_management_init();
     ble_stack_init();
     gap_params_init();
@@ -1472,8 +1623,8 @@ int main(void)
     queue_create_func();
     task_create_func();
     
+    //Set TCS34725 initialization value
     tcs34725_start();
-//    tcs34725_read_config();
 
     // Start execution.
     printf("\r\nUART started.\r\n");
@@ -1489,7 +1640,6 @@ int main(void)
         APP_ERROR_HANDLER(NRF_ERROR_FORBIDDEN);
     }
 }
-
 
 /**
  * @}
