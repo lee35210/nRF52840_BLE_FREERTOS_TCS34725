@@ -56,6 +56,14 @@ typedef struct{
     bool power_on;
 }tcs34725_config_enable_t;
 
+typedef struct{
+    char cmd[4],data[6];
+}tcs34725_cmd_t;
+
+typedef struct{
+    char send_data[9];
+}tcs34725_ble_reg_t;
+
 typedef enum
 {
     TCS34725_OUT_OF_RANGE_0,
@@ -174,4 +182,8 @@ ret_code_t tcs34725_int_clear(tcs34725_instance_t const * p_instance);
 
 ret_code_t tcs34725_set_interrupt(tcs34725_instance_t const * p_instance,
                                   tcs34725_int_enable_t int_enable);
+
+int tcs34725_per_bintodec(tcs34725_persistence_t bit_value);
+tcs34725_persistence_t tcs34725_per_dectobin(uint8_t dec_value);
+
 #endif // TCS34725_H
