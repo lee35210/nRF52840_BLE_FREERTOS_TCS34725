@@ -306,8 +306,7 @@ static void nus_data_handler(ble_nus_evt_t * p_evt)
     if (p_evt->type == BLE_NUS_EVT_RX_DATA)
     {
         uint32_t err_code;
-        uint8_t queue_left;
-        static tcs34725_cmd_t nus_cmd_str={0};
+        tcs34725_cmd_t nus_cmd_str={0};
 
         NRF_LOG_DEBUG("Received data from BLE NUS. Writing data on UART.");
         NRF_LOG_HEXDUMP_DEBUG(p_evt->params.rx_data.p_data, p_evt->params.rx_data.length);
@@ -340,12 +339,8 @@ static void nus_data_handler(ble_nus_evt_t * p_evt)
         {
             memcpy(nus_cmd_str.data,&p_evt->params.rx_data.p_data[3],5);
         }
-
         
-        queue_left=uxQueueSpacesAvailable(m_tcs_cmd_queue);
-        printf("queue left : %d\r\n",queue_left);
-        printf("receive cmd : %s\r\n",nus_cmd_str.cmd);
-        if(queue_left!=0)
+        if(uxQueueSpacesAvailable(m_tcs_cmd_queue)!=0)
         {
             if(pdPASS!=xQueueSend(m_tcs_cmd_queue,&nus_cmd_str,10))
             {
@@ -1313,37 +1308,16 @@ static void tcs_wr_reg_thread(void *arg)
 
     ret_code_t err_code;
     tcs34725_cmd_t wr_cmd_str;
-    tcs34725_reg_data_t wr_reg_str;
     uint8_t notify_value;
     bool queue_full=false;
 
     while(1)
     {
-        notify_value=ulTaskNotifyTake(pdFALSE,10);
-//        if((notify_value!=0)&&(pdPASS==xQueueReceive(m_tcs_cmd_queue,&wr_cmd_str,10)))
-//        if((ulTaskNotifyTake(pdTRUE,10)!=0)&&(pdPASS==xQueueReceive(m_tcs_cmd_queue,&wr_cmd_str,10)))
-        if(notify_value!=0)
+        if((ulTaskNotifyTake(pdTRUE,10)!=0)&&(pdPASS==xQueueReceive(m_tcs_cmd_queue,&wr_cmd_str,10)))
         {
-            if(pdPASS==xQueueReceive(m_tcs_cmd_queue,&wr_cmd_str,10))
-            {
-            printf("wr notify : %d\r\n",notify_value);
-            printf("wr reg : %s\r\n",wr_cmd_str.cmd);
             tcs34725_cmd_func(&wr_cmd_str);
-            }
         }
-        if(notify_value==8)
-        {
-            queue_full=true;
-        }
-        if((notify_value==1)&&(queue_full==true))
-        {
-            if(pdPASS!=xQueueReset(m_tcs_cmd_queue))
-            {
-                //reset fail
-            }
-            queue_full=false;
-        }
-        vTaskDelay(500);
+        vTaskDelay(100);
 
         #ifdef STACK_SIZE_CHK
         uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
