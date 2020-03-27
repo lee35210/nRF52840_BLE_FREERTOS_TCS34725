@@ -1201,7 +1201,7 @@ void tcs34725_read_thr_cb(ret_code_t result, tcs34725_threshold_data_t * p_reg_d
     {
         if(pdPASS!=xQueueSend(m_tcs_reg_data_queue,&tcs_ble_send_str,10))
         {
-            NRF_LOG_INFO("TCS34725 THRESHOLD CB : Queue send fail\r\n");
+            NRF_LOG_INFO("TCS34725 THRESHOLD CB : Queue send fail");
         }
         xTaskNotifyGive(m_ble_tcs_reg_send_thread);
     }
@@ -1209,7 +1209,7 @@ void tcs34725_read_thr_cb(ret_code_t result, tcs34725_threshold_data_t * p_reg_d
     {
         if(pdPASS!=xQueueOverwrite(m_tcs_reg_data_queue,&tcs_ble_send_str))
         {
-            NRF_LOG_INFO("TCS34725 THRESHOLD CB : Queue overwrite fail\r\n");
+            NRF_LOG_INFO("TCS34725 THRESHOLD CB : Queue overwrite fail");
         }
     }
     
@@ -1309,7 +1309,7 @@ static void tcs_read_all_reg_thread(void *arg)
         if(uxHighWaterMark2<stack_left)
         {
             stack_left=uxHighWaterMark2;
-            printf("TCS all read stack left : %d\r\n",stack_left);
+            printf("Available stack size of thread reading all TCS34725 register : %d\r\n",stack_left);
         }
         #endif
 
@@ -1341,7 +1341,7 @@ static void tcs_wr_reg_thread(void *arg)
         if(uxHighWaterMark2<stack_left)
         {
             stack_left=uxHighWaterMark2;
-            printf("TCS WR STACK LEFT : %d\r\n",uxHighWaterMark2);
+            printf("Available stack size of TCS34725 WR thread : %d\r\n",uxHighWaterMark2);
         }
         #endif
     }
@@ -1367,7 +1367,7 @@ static void tcs_read_rgbc_thread(void *arg)
         if(uxHighWaterMark2<stack_left)
         {
             stack_left=uxHighWaterMark2;
-            printf("RGBC read stack left : %d\r\n",uxHighWaterMark2);
+            printf("Available stack size of RGBC read thread : %d\r\n",uxHighWaterMark2);
         }
         #endif
     }
@@ -1408,7 +1408,7 @@ static void ble_tcs_rgbc_send_thread(void *arg)
             if(uxHighWaterMark2<stack_left)
             {
                 stack_left=uxHighWaterMark2;
-                printf("BLE rgbc send stack left : %d\r\n",uxHighWaterMark2);
+                printf("Available stack size of thread sending RGBC data via BLE : %d\r\n",uxHighWaterMark2);
             }
             #endif
         }
@@ -1447,7 +1447,7 @@ static void ble_tcs_reg_send_thread(void *arg)
             if(uxHighWaterMark2<stack_left)
             {
                 stack_left=uxHighWaterMark2;
-                printf("BLE reg send stack left : %d\r\n",uxHighWaterMark2);
+                printf("Available stack size of thread sending register data via BLE : %d\r\n",uxHighWaterMark2);
             }
             #endif
         }
