@@ -99,7 +99,7 @@ ret_code_t tcs34725_set_timing(tcs34725_instance_t const * p_instance,
 }
 
 ret_code_t tcs34725_set_wait_time(tcs34725_instance_t const * p_instance,
-                                  uint8_t wait_val)
+                                  uint16_t wait_val)
 {
     ret_code_t err_code;
     if((wait_val==0)||(256 < wait_val))
@@ -110,7 +110,7 @@ ret_code_t tcs34725_set_wait_time(tcs34725_instance_t const * p_instance,
 
     tcs34725_reg_data_t wait_time_str;
     wait_time_str.reg_addr=TCS34725_REG_WAIT_TIME;
-    wait_time_str.reg_data=256-wait_val;
+    wait_time_str.reg_data=(256-wait_val);
     
     err_code=tcs34725_write_reg(p_instance,&wait_time_str);
     return err_code;

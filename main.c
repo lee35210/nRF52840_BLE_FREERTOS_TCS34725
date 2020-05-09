@@ -940,7 +940,7 @@ int chartoint(char *char_value, uint8_t length)
 
 void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
 {
-    static tcs34725_reg_data_t tcs_cmd_str;
+    static tcs34725_reg_data_t tcs_cmd_str={0};
     ret_code_t err_code;
 
     if(strcmp(cmd_func_str->cmd,"RAR")==0)
@@ -1100,6 +1100,7 @@ void tcs34725_read_reg_cb(ret_code_t result, tcs34725_reg_data_t * p_raw_data)
 {
     char read_reg_cb_cmd[]="CMD";
     uint8_t persistence_value;
+    uint16_t reg_value;
 
     if(result!=NRF_SUCCESS)
     {
@@ -1107,7 +1108,7 @@ void tcs34725_read_reg_cb(ret_code_t result, tcs34725_reg_data_t * p_raw_data)
         return;
     }
     p_raw_data->reg_addr&=0x1F;
-    
+
     switch(p_raw_data->reg_addr)
     {
         case TCS34725_REG_ENABLE :
@@ -1117,12 +1118,14 @@ void tcs34725_read_reg_cb(ret_code_t result, tcs34725_reg_data_t * p_raw_data)
         case TCS34725_REG_TIMING :
             NRF_LOG_INFO("Timing register : %X",p_raw_data->reg_data);
             strcpy(read_reg_cb_cmd,"TIM");
-            p_raw_data->reg_data=256-p_raw_data->reg_data;
+//            p_raw_data->reg_data=256-p_raw_data->reg_data;
+            reg_value=256-p_raw_data->reg_data;
             break;
         case TCS34725_REG_WAIT_TIME :
             NRF_LOG_INFO("Wait time register : %X",p_raw_data->reg_data);
             strcpy(read_reg_cb_cmd,"WAT");
-            p_raw_data->reg_data=256-p_raw_data->reg_data;
+//            p_raw_data->reg_data=256-p_raw_data->reg_data;
+            reg_value=256-p_raw_data->reg_data;
             break;
         case TCS34725_REG_PERSISTENCE :
             NRF_LOG_INFO("Persistence register : %X",p_raw_data->reg_data);
@@ -1152,7 +1155,14 @@ void tcs34725_read_reg_cb(ret_code_t result, tcs34725_reg_data_t * p_raw_data)
     }
 
     tcs34725_ble_reg_t tcs_ble_send_str;
-    sprintf(tcs_ble_send_str.send_data,"%s%3d",read_reg_cb_cmd,p_raw_data->reg_data);
+    if((p_raw_data->reg_addr==TCS34725_REG_TIMING)||(p_raw_data->reg_addr==TCS34725_REG_WAIT_TIME))
+    {
+        sprintf(tcs_ble_send_str.send_data,"%s%3d",read_reg_cb_cmd,reg_value);
+    }
+    else
+    {
+        sprintf(tcs_ble_send_str.send_data,"%s%3d",read_reg_cb_cmd,p_raw_data->reg_data);
+    }
   
     if(uxQueueSpacesAvailable(m_tcs_reg_data_queue)!=0)
     {

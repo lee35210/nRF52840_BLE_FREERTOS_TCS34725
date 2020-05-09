@@ -148,7 +148,7 @@ ret_code_t tcs34725_set_timing(tcs34725_instance_t const * p_instance,
                                 uint16_t atime);
 
 ret_code_t tcs34725_set_wait_time(tcs34725_instance_t const * p_instance,
-                                  uint8_t wait_val);
+                                  uint16_t wait_val);
 
 ret_code_t tcs34725_set_persistence(tcs34725_instance_t const * p_instance,
                                     tcs34725_persistence_t out_of_range_val);
