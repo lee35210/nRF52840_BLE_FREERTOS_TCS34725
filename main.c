@@ -1153,7 +1153,7 @@ void tcs34725_read_reg_cb(ret_code_t result, tcs34725_reg_data_t * p_raw_data)
         default :
             break;
     }
-
+    
     tcs34725_ble_reg_t tcs_ble_send_str;
     if((p_raw_data->reg_addr==TCS34725_REG_TIMING)||(p_raw_data->reg_addr==TCS34725_REG_WAIT_TIME))
     {
@@ -1273,57 +1273,57 @@ static void tcs_read_all_reg_thread(void *arg)
     static tcs34725_reg_data_t enable,timing,waittime,persistence,config,control,id,status;
     static tcs34725_threshold_data_t th_low,th_high;
 
-    tcs34725_reg_data_t *all_reg_read=(tcs34725_reg_data_t*)malloc(sizeof(tcs34725_reg_data_t)*8);
-    tcs34725_threshold_data_t *all_reg_read_thr=(tcs34725_threshold_data_t*)malloc(sizeof(tcs34725_threshold_data_t)*2);
+    uint16_t heap_left_size;
+    heap_left_size=xPortGetFreeHeapSize();
+    printf("1 left heap size : %d\r\n",heap_left_size);
+    
+    
+    tcs34725_reg_data_t *all_reg_read=(tcs34725_reg_data_t*)pvPortMalloc(sizeof(tcs34725_reg_data_t)*8);
+    tcs34725_threshold_data_t *all_reg_read_thr=(tcs34725_threshold_data_t*)pvPortMalloc(sizeof(tcs34725_threshold_data_t)*2);
+    
+    heap_left_size=xPortGetFreeHeapSize();
+    printf("2 left heap size : %d\r\n",heap_left_size);
+    printf("reg size : %d\r\n",sizeof(tcs34725_reg_data_t));
+    printf("thr size : %d\r\n",sizeof(tcs34725_threshold_data_t));
 
     while(1)
     {
-//        enable.reg_addr=TCS34725_REG_ENABLE;
         all_reg_read[0].reg_addr=TCS34725_REG_ENABLE;
         tcs34725_read_reg(&tcs34725_instance, &all_reg_read[0], tcs34725_read_reg_cb);
-        vTaskDelay(10);
+//        vTaskDelay(10);
 
-//        timing.reg_addr=TCS34725_REG_TIMING;
         all_reg_read[1].reg_addr=TCS34725_REG_TIMING;
         tcs34725_read_reg(&tcs34725_instance, &all_reg_read[1], tcs34725_read_reg_cb);
-        vTaskDelay(10);
+//        vTaskDelay(10);
         
-//        waittime.reg_addr=TCS34725_REG_WAIT_TIME;
         all_reg_read[2].reg_addr=TCS34725_REG_WAIT_TIME;
         tcs34725_read_reg(&tcs34725_instance, &all_reg_read[2], tcs34725_read_reg_cb);
-        vTaskDelay(10);
+//        vTaskDelay(10);
         
-//        persistence.reg_addr=TCS34725_REG_PERSISTENCE;
         all_reg_read[3].reg_addr=TCS34725_REG_PERSISTENCE;
         tcs34725_read_reg(&tcs34725_instance, &all_reg_read[3], tcs34725_read_reg_cb);
-        vTaskDelay(10);
+//        vTaskDelay(10);
         
-//        config.reg_addr=TCS34725_REG_CONFIG;
         all_reg_read[4].reg_addr=TCS34725_REG_CONFIG;
         tcs34725_read_reg(&tcs34725_instance, &all_reg_read[4], tcs34725_read_reg_cb);
-        vTaskDelay(10);
+//        vTaskDelay(10);
         
-//        control.reg_addr=TCS34725_REG_CONTROL;
         all_reg_read[5].reg_addr=TCS34725_REG_CONTROL;
         tcs34725_read_reg(&tcs34725_instance, &all_reg_read[5], tcs34725_read_reg_cb);
-        vTaskDelay(10);
+//        vTaskDelay(10);
         
-//        id.reg_addr=TCS34725_REG_ID;
         all_reg_read[6].reg_addr=TCS34725_REG_ID;
         tcs34725_read_reg(&tcs34725_instance, &all_reg_read[6], tcs34725_read_reg_cb);
-        vTaskDelay(10);
+//        vTaskDelay(10);
         
-//        status.reg_addr=TCS34725_REG_STATUS;
         all_reg_read[7].reg_addr=TCS34725_REG_STATUS;
         tcs34725_read_reg(&tcs34725_instance, &all_reg_read[7], tcs34725_read_reg_cb);
-        vTaskDelay(10);
+//        vTaskDelay(10);
 
-//        th_low.reg_addr=TCS34725_REG_THRESHOLD_LOW_L;
         all_reg_read_thr[0].reg_addr=TCS34725_REG_THRESHOLD_LOW_L;
         tcs34725_read_threshold(&tcs34725_instance, TCS34725_THRESHOLD_LOW, tcs34725_read_thr_cb);
-        vTaskDelay(10);
+//        vTaskDelay(10);
 
-//        th_high.reg_addr=TCS34725_REG_THRESHOLD_HIGH_L;
         all_reg_read_thr[1].reg_addr=TCS34725_REG_THRESHOLD_HIGH_L;
         tcs34725_read_threshold(&tcs34725_instance, TCS34725_THRESHOLD_HIGH, tcs34725_read_thr_cb);
         
@@ -1336,6 +1336,11 @@ static void tcs_read_all_reg_thread(void *arg)
         }
         #endif
 
+        vPortFree(all_reg_read);
+        vPortFree(all_reg_read_thr);
+//        uint16_t heap_left_size;
+        heap_left_size=xPortGetFreeHeapSize();
+        printf("3 left heap size : %d\r\n",heap_left_size);
         vTaskDelete(m_tcs_reg_all_send_thread);
     }
 }
