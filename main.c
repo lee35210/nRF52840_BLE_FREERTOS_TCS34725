@@ -1099,6 +1099,7 @@ void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
         return;
     }
     vPortFree(tcs_cmd_thr);
+    vPortFree(tcs_cmd_str);
 }
 
 /*@Callback
