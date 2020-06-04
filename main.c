@@ -940,9 +940,9 @@ int chartoint(char *char_value, uint8_t length)
 
 void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
 {
-    static tcs34725_reg_data_t tcs_cmd_str={0};
-//    tcs34725_threshold_data_t tcs_cmd_thr={0};
-    
+//    static tcs34725_reg_data_t tcs_cmd_str={0};
+
+    tcs34725_reg_data_t *tcs_cmd_str=(tcs34725_reg_data_t*)pvPortMalloc(sizeof(tcs34725_reg_data_t));
     tcs34725_threshold_data_t *tcs_cmd_thr=(tcs34725_threshold_data_t*)pvPortMalloc(sizeof(tcs34725_threshold_data_t));
 
     ret_code_t err_code;
@@ -964,8 +964,8 @@ void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
             NRF_LOG_INFO("Set timing fail");
             return;
         }
-        tcs_cmd_str.reg_addr=TCS34725_REG_TIMING;
-        err_code=tcs34725_read_reg(&tcs34725_instance,&tcs_cmd_str,tcs34725_read_reg_cb);
+        tcs_cmd_str->reg_addr=TCS34725_REG_TIMING;
+        err_code=tcs34725_read_reg(&tcs34725_instance,tcs_cmd_str,tcs34725_read_reg_cb);
         if(err_code!=NRF_SUCCESS)
         {
             NRF_LOG_INFO("Read timing fail");
@@ -981,8 +981,8 @@ void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
             NRF_LOG_INFO("Set wait time fail");
             return;
         }
-        tcs_cmd_str.reg_addr=TCS34725_REG_WAIT_TIME;
-        err_code=tcs34725_read_reg(&tcs34725_instance,&tcs_cmd_str,tcs34725_read_reg_cb);
+        tcs_cmd_str->reg_addr=TCS34725_REG_WAIT_TIME;
+        err_code=tcs34725_read_reg(&tcs34725_instance,tcs_cmd_str,tcs34725_read_reg_cb);
         if(err_code!=NRF_SUCCESS)
         {
             NRF_LOG_INFO("Read wait time fail");
@@ -998,8 +998,8 @@ void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
             NRF_LOG_INFO("Set gain fail");
             return;
         }
-        tcs_cmd_str.reg_addr=TCS34725_REG_CONTROL;
-        err_code=tcs34725_read_reg(&tcs34725_instance,&tcs_cmd_str,tcs34725_read_reg_cb);
+        tcs_cmd_str->reg_addr=TCS34725_REG_CONTROL;
+        err_code=tcs34725_read_reg(&tcs34725_instance,tcs_cmd_str,tcs34725_read_reg_cb);
         if(err_code!=NRF_SUCCESS)
         {
             NRF_LOG_INFO("Read gain fail");
@@ -1015,8 +1015,8 @@ void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
             NRF_LOG_INFO("Set interrupt fail");
             return;
         }
-        tcs_cmd_str.reg_addr=TCS34725_REG_ENABLE;
-        err_code=tcs34725_read_reg(&tcs34725_instance,&tcs_cmd_str,tcs34725_read_reg_cb);
+        tcs_cmd_str->reg_addr=TCS34725_REG_ENABLE;
+        err_code=tcs34725_read_reg(&tcs34725_instance,tcs_cmd_str,tcs34725_read_reg_cb);
         if(err_code!=NRF_SUCCESS)
         {
             NRF_LOG_INFO("Read interrupt fail");
@@ -1032,8 +1032,8 @@ void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
             NRF_LOG_INFO("Set wait long fail");
             return;
         }
-        tcs_cmd_str.reg_addr=TCS34725_REG_CONFIG;
-        err_code=tcs34725_read_reg(&tcs34725_instance,&tcs_cmd_str,tcs34725_read_reg_cb);
+        tcs_cmd_str->reg_addr=TCS34725_REG_CONFIG;
+        err_code=tcs34725_read_reg(&tcs34725_instance,tcs_cmd_str,tcs34725_read_reg_cb);
         if(err_code!=NRF_SUCCESS)
         {
             NRF_LOG_INFO("Read wait long fail");
@@ -1052,8 +1052,8 @@ void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
             NRF_LOG_INFO("Set Persistence fail");
             return;
         }
-        tcs_cmd_str.reg_addr=TCS34725_REG_PERSISTENCE;
-        err_code=tcs34725_read_reg(&tcs34725_instance,&tcs_cmd_str,tcs34725_read_reg_cb);
+        tcs_cmd_str->reg_addr=TCS34725_REG_PERSISTENCE;
+        err_code=tcs34725_read_reg(&tcs34725_instance,tcs_cmd_str,tcs34725_read_reg_cb);
         if(err_code!=NRF_SUCCESS)
         {
             NRF_LOG_INFO("Read Persistence fail");
@@ -1278,9 +1278,6 @@ static void tcs_read_all_reg_thread(void *arg)
     uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
     uint8_t stack_left=255;
     #endif
-
-    static tcs34725_reg_data_t enable,timing,waittime,persistence,config,control,id,status;
-    static tcs34725_threshold_data_t th_low,th_high;
 
     uint16_t heap_left_size;
     heap_left_size=xPortGetFreeHeapSize();
