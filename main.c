@@ -1098,6 +1098,7 @@ void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
     {
         return;
     }
+    vPortFree(tcs_cmd_thr);
 }
 
 /*@Callback
@@ -1215,6 +1216,10 @@ void tcs34725_read_thr_cb(ret_code_t result, tcs34725_threshold_data_t * p_reg_d
 
     tcs34725_ble_reg_t tcs_ble_send_str;
     sprintf(tcs_ble_send_str.send_data,"%s%5d",read_thr_cb_cmd,p_reg_data->threshold_data);
+    vPortFree(p_reg_data);
+    uint16_t heap_left_size;
+    heap_left_size=xPortGetFreeHeapSize();
+    printf("thr cb : %d\r\n",heap_left_size);
 
     if(uxQueueSpacesAvailable(m_tcs_reg_data_queue)!=0)
     {
@@ -1285,12 +1290,12 @@ static void tcs_read_all_reg_thread(void *arg)
     
     
     tcs34725_reg_data_t *all_reg_read=(tcs34725_reg_data_t*)pvPortMalloc(sizeof(tcs34725_reg_data_t)*8);
-    tcs34725_threshold_data_t *all_reg_read_thr=(tcs34725_threshold_data_t*)pvPortMalloc(sizeof(tcs34725_threshold_data_t)*2);
+
+    tcs34725_threshold_data_t *threshold_low=(tcs34725_threshold_data_t*)pvPortMalloc(sizeof(tcs34725_threshold_data_t));
+    tcs34725_threshold_data_t *threshold_high=(tcs34725_threshold_data_t*)pvPortMalloc(sizeof(tcs34725_threshold_data_t));
     
     heap_left_size=xPortGetFreeHeapSize();
     printf("2 left heap size : %d\r\n",heap_left_size);
-    printf("reg size : %d\r\n",sizeof(tcs34725_reg_data_t));
-    printf("thr size : %d\r\n",sizeof(tcs34725_threshold_data_t));
 
     while(1)
     {
@@ -1326,14 +1331,12 @@ static void tcs_read_all_reg_thread(void *arg)
         tcs34725_read_reg(&tcs34725_instance, &all_reg_read[7], tcs34725_read_reg_cb);
 //        vTaskDelay(10);
 
-        all_reg_read_thr[0].reg_addr=TCS34725_REG_THRESHOLD_LOW_L;
-        printf("thr addr : %x\r\n",all_reg_read_thr[0].reg_addr);
-        tcs34725_read_threshold(&tcs34725_instance, &all_reg_read_thr[0], tcs34725_read_thr_cb);
+        threshold_low->reg_addr=TCS34725_REG_THRESHOLD_LOW_L;
+        tcs34725_read_threshold(&tcs34725_instance, threshold_low, tcs34725_read_thr_cb);
 //        vTaskDelay(10);
 
-        all_reg_read_thr[1].reg_addr=TCS34725_REG_THRESHOLD_HIGH_L;
-        printf("thr2 addr : %x\r\n",all_reg_read_thr[1].reg_addr);
-        tcs34725_read_threshold(&tcs34725_instance, &all_reg_read_thr[1], tcs34725_read_thr_cb);
+        threshold_high->reg_addr=TCS34725_REG_THRESHOLD_HIGH_L;
+        tcs34725_read_threshold(&tcs34725_instance, threshold_high, tcs34725_read_thr_cb);
         
         #ifdef STACK_SIZE_CHK
         uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
@@ -1345,7 +1348,7 @@ static void tcs_read_all_reg_thread(void *arg)
         #endif
 
         vPortFree(all_reg_read);
-        vPortFree(all_reg_read_thr);
+//        vPortFree(all_reg_read_thr);
         heap_left_size=xPortGetFreeHeapSize();
         printf("3 left heap size : %d\r\n",heap_left_size);
         vTaskDelete(m_tcs_reg_all_send_thread);

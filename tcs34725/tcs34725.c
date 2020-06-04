@@ -51,8 +51,6 @@ ret_code_t tcs34725_read_threshold(tcs34725_instance_t const * p_instance,
 //        return err_code;
 //    }
 
-    
-    printf("source thr : %X\r\n",thr_data_str->reg_addr);
     err_code=nrf_twi_sensor_reg_read(p_instance->p_sensor_data,
                                      p_instance->sensor_addr,
                                      thr_data_str->reg_addr|0xA0,
