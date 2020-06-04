@@ -1273,45 +1273,58 @@ static void tcs_read_all_reg_thread(void *arg)
     static tcs34725_reg_data_t enable,timing,waittime,persistence,config,control,id,status;
     static tcs34725_threshold_data_t th_low,th_high;
 
+    tcs34725_reg_data_t *all_reg_read=(tcs34725_reg_data_t*)malloc(sizeof(tcs34725_reg_data_t)*8);
+    tcs34725_threshold_data_t *all_reg_read_thr=(tcs34725_threshold_data_t*)malloc(sizeof(tcs34725_threshold_data_t)*2);
+
     while(1)
     {
-        enable.reg_addr=TCS34725_REG_ENABLE;
-        tcs34725_read_reg(&tcs34725_instance, &enable, tcs34725_read_reg_cb);
+//        enable.reg_addr=TCS34725_REG_ENABLE;
+        all_reg_read[0].reg_addr=TCS34725_REG_ENABLE;
+        tcs34725_read_reg(&tcs34725_instance, &all_reg_read[0], tcs34725_read_reg_cb);
         vTaskDelay(10);
 
-        timing.reg_addr=TCS34725_REG_TIMING;
-        tcs34725_read_reg(&tcs34725_instance, &timing, tcs34725_read_reg_cb);
+//        timing.reg_addr=TCS34725_REG_TIMING;
+        all_reg_read[1].reg_addr=TCS34725_REG_TIMING;
+        tcs34725_read_reg(&tcs34725_instance, &all_reg_read[1], tcs34725_read_reg_cb);
         vTaskDelay(10);
         
-        waittime.reg_addr=TCS34725_REG_WAIT_TIME;
-        tcs34725_read_reg(&tcs34725_instance, &waittime, tcs34725_read_reg_cb);
+//        waittime.reg_addr=TCS34725_REG_WAIT_TIME;
+        all_reg_read[2].reg_addr=TCS34725_REG_WAIT_TIME;
+        tcs34725_read_reg(&tcs34725_instance, &all_reg_read[2], tcs34725_read_reg_cb);
         vTaskDelay(10);
         
-        persistence.reg_addr=TCS34725_REG_PERSISTENCE;
-        tcs34725_read_reg(&tcs34725_instance, &persistence, tcs34725_read_reg_cb);
+//        persistence.reg_addr=TCS34725_REG_PERSISTENCE;
+        all_reg_read[3].reg_addr=TCS34725_REG_PERSISTENCE;
+        tcs34725_read_reg(&tcs34725_instance, &all_reg_read[3], tcs34725_read_reg_cb);
         vTaskDelay(10);
         
-        config.reg_addr=TCS34725_REG_CONFIG;
-        tcs34725_read_reg(&tcs34725_instance, &config, tcs34725_read_reg_cb);
+//        config.reg_addr=TCS34725_REG_CONFIG;
+        all_reg_read[4].reg_addr=TCS34725_REG_CONFIG;
+        tcs34725_read_reg(&tcs34725_instance, &all_reg_read[4], tcs34725_read_reg_cb);
         vTaskDelay(10);
         
-        control.reg_addr=TCS34725_REG_CONTROL;
-        tcs34725_read_reg(&tcs34725_instance, &control, tcs34725_read_reg_cb);
+//        control.reg_addr=TCS34725_REG_CONTROL;
+        all_reg_read[5].reg_addr=TCS34725_REG_CONTROL;
+        tcs34725_read_reg(&tcs34725_instance, &all_reg_read[5], tcs34725_read_reg_cb);
         vTaskDelay(10);
         
-        id.reg_addr=TCS34725_REG_ID;
-        tcs34725_read_reg(&tcs34725_instance, &id, tcs34725_read_reg_cb);
+//        id.reg_addr=TCS34725_REG_ID;
+        all_reg_read[6].reg_addr=TCS34725_REG_ID;
+        tcs34725_read_reg(&tcs34725_instance, &all_reg_read[6], tcs34725_read_reg_cb);
         vTaskDelay(10);
         
-        status.reg_addr=TCS34725_REG_STATUS;
-        tcs34725_read_reg(&tcs34725_instance, &status, tcs34725_read_reg_cb);
+//        status.reg_addr=TCS34725_REG_STATUS;
+        all_reg_read[7].reg_addr=TCS34725_REG_STATUS;
+        tcs34725_read_reg(&tcs34725_instance, &all_reg_read[7], tcs34725_read_reg_cb);
         vTaskDelay(10);
 
-        th_low.reg_addr=TCS34725_REG_THRESHOLD_LOW_L;
+//        th_low.reg_addr=TCS34725_REG_THRESHOLD_LOW_L;
+        all_reg_read_thr[0].reg_addr=TCS34725_REG_THRESHOLD_LOW_L;
         tcs34725_read_threshold(&tcs34725_instance, TCS34725_THRESHOLD_LOW, tcs34725_read_thr_cb);
         vTaskDelay(10);
 
-        th_high.reg_addr=TCS34725_REG_THRESHOLD_HIGH_L;
+//        th_high.reg_addr=TCS34725_REG_THRESHOLD_HIGH_L;
+        all_reg_read_thr[1].reg_addr=TCS34725_REG_THRESHOLD_HIGH_L;
         tcs34725_read_threshold(&tcs34725_instance, TCS34725_THRESHOLD_HIGH, tcs34725_read_thr_cb);
         
         #ifdef STACK_SIZE_CHK
