@@ -941,7 +941,10 @@ int chartoint(char *char_value, uint8_t length)
 void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
 {
     static tcs34725_reg_data_t tcs_cmd_str={0};
-    tcs34725_threshold_data_t tcs_cmd_thr={0};
+//    tcs34725_threshold_data_t tcs_cmd_thr={0};
+    
+    tcs34725_threshold_data_t *tcs_cmd_thr=(tcs34725_threshold_data_t*)pvPortMalloc(sizeof(tcs34725_threshold_data_t));
+
     ret_code_t err_code;
 
     if(strcmp(cmd_func_str->cmd,"RAR")==0)
@@ -1066,8 +1069,8 @@ void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
             NRF_LOG_INFO("Set Threshold Low fail");
             return;
         }
-        tcs_cmd_thr.reg_addr=TCS34725_REG_THRESHOLD_LOW_L;
-        err_code=tcs34725_read_threshold(&tcs34725_instance, &tcs_cmd_thr, tcs34725_read_thr_cb);
+        tcs_cmd_thr->reg_addr=TCS34725_REG_THRESHOLD_LOW_L;
+        err_code=tcs34725_read_threshold(&tcs34725_instance, tcs_cmd_thr, tcs34725_read_thr_cb);
         if(err_code!=NRF_SUCCESS)
         {
             NRF_LOG_INFO("Read Threshold Low fail");
@@ -1083,8 +1086,8 @@ void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
             NRF_LOG_INFO("Set Threshold High fail");
             return;
         }
-        tcs_cmd_thr.reg_addr=TCS34725_REG_THRESHOLD_HIGH_L;
-        err_code=tcs34725_read_threshold(&tcs34725_instance, &tcs_cmd_thr, tcs34725_read_thr_cb);
+        tcs_cmd_thr->reg_addr=TCS34725_REG_THRESHOLD_HIGH_L;
+        err_code=tcs34725_read_threshold(&tcs34725_instance, tcs_cmd_thr, tcs34725_read_thr_cb);
         if(err_code!=NRF_SUCCESS)
         {
             NRF_LOG_INFO("Read Threshold High fail");
@@ -1327,10 +1330,12 @@ static void tcs_read_all_reg_thread(void *arg)
 //        vTaskDelay(10);
 
         all_reg_read_thr[0].reg_addr=TCS34725_REG_THRESHOLD_LOW_L;
+        printf("thr addr : %x\r\n",all_reg_read_thr[0].reg_addr);
         tcs34725_read_threshold(&tcs34725_instance, &all_reg_read_thr[0], tcs34725_read_thr_cb);
 //        vTaskDelay(10);
 
         all_reg_read_thr[1].reg_addr=TCS34725_REG_THRESHOLD_HIGH_L;
+        printf("thr2 addr : %x\r\n",all_reg_read_thr[1].reg_addr);
         tcs34725_read_threshold(&tcs34725_instance, &all_reg_read_thr[1], tcs34725_read_thr_cb);
         
         #ifdef STACK_SIZE_CHK

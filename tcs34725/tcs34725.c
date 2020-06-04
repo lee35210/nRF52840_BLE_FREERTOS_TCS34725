@@ -5,6 +5,8 @@
 #include "nrf_log_default_backends.h"
 #include "nrf_gpio.h"
 #include "tcs34725.h"
+#include <stdio.h>
+#include <string.h>
 
 ret_code_t tcs34725_write_reg(tcs34725_instance_t const * p_instance,
                               tcs34725_reg_data_t *       p_reg_data)
@@ -26,6 +28,69 @@ ret_code_t tcs34725_read_reg(tcs34725_instance_t const * p_instance,
                                    (nrf_twi_sensor_reg_cb_t) user_cb,
                                    (uint8_t *) p_reg_data,
                                    TCS34725_REGISTER_SIZE);
+}
+
+ret_code_t tcs34725_read_threshold(tcs34725_instance_t const * p_instance, 
+                                   tcs34725_threshold_data_t * thr_data_str,
+                                   tcs34725_threshold_callback_t user_cb)
+{
+    ret_code_t err_code;
+//    static tcs34725_threshold_data_t thr_data_str;
+//
+//    if(thr_low_high==TCS34725_THRESHOLD_LOW)
+//    {
+//        thr_data_str.reg_addr=TCS34725_REG_THRESHOLD_LOW_L;
+//    }
+//    else if(thr_low_high==TCS34725_THRESHOLD_HIGH)
+//    {
+//        thr_data_str.reg_addr=TCS34725_REG_THRESHOLD_HIGH_L;
+//    }
+//    else
+//    {
+//        err_code=NRF_ERROR_INVALID_ADDR;
+//        return err_code;
+//    }
+
+    
+    printf("source thr : %X\r\n",thr_data_str->reg_addr);
+    err_code=nrf_twi_sensor_reg_read(p_instance->p_sensor_data,
+                                     p_instance->sensor_addr,
+                                     thr_data_str->reg_addr|0xA0,
+                                     (nrf_twi_sensor_reg_cb_t) user_cb,
+                                     (uint8_t *) thr_data_str,
+                                     TCS34725_THRESHOLD_BYTES);
+    return err_code;
+}
+
+ret_code_t tcs34725_set_threshold(tcs34725_instance_t const * p_instance,
+                                  tcs34725_threshold_lh_t threshold_low_high,
+                                  uint16_t threshold_val)
+{
+    ret_code_t err_code;
+    tcs34725_threshold_data_t threshold_str;
+    threshold_str.threshold_data=threshold_val;
+
+    if(threshold_low_high==TCS34725_THRESHOLD_LOW)
+    {
+        threshold_str.reg_addr=TCS34725_REG_THRESHOLD_LOW_L;
+    }
+    else if(threshold_low_high==TCS34725_THRESHOLD_HIGH)
+    {
+        threshold_str.reg_addr=TCS34725_REG_THRESHOLD_HIGH_L;
+    }
+    else
+    {
+        err_code=NRF_ERROR_INVALID_ADDR;
+        return err_code;
+    }
+
+    NRF_LOG_INFO("Set threshold value : %d",threshold_str.threshold_data);
+    err_code=nrf_twi_sensor_reg_write(p_instance->p_sensor_data,
+                                      p_instance->sensor_addr,
+                                      threshold_str.reg_addr|0xA0,
+                                      (uint8_t *)&threshold_str,
+                                      TCS34725_THRESHOLD_BYTES);
+    return err_code;
 }
 
 ret_code_t tcs34725_init(tcs34725_instance_t const * p_instance)
@@ -191,67 +256,6 @@ void tcs34725_rgbc_print(tcs34725_rgbc_data_t * color_str)
 //    NRF_LOG_INFO("Red   : %d",c_red);
 //    NRF_LOG_INFO("Green : %d",c_green);
 //    NRF_LOG_INFO("Blue  : %d",c_blue);
-}
-
-ret_code_t tcs34725_set_threshold(tcs34725_instance_t const * p_instance,
-                                  tcs34725_threshold_lh_t threshold_low_high,
-                                  uint16_t threshold_val)
-{
-    ret_code_t err_code;
-    tcs34725_threshold_data_t threshold_str;
-    threshold_str.threshold_data=threshold_val;
-
-    if(threshold_low_high==TCS34725_THRESHOLD_LOW)
-    {
-        threshold_str.reg_addr=TCS34725_REG_THRESHOLD_LOW_L;
-    }
-    else if(threshold_low_high==TCS34725_THRESHOLD_HIGH)
-    {
-        threshold_str.reg_addr=TCS34725_REG_THRESHOLD_HIGH_L;
-    }
-    else
-    {
-        err_code=NRF_ERROR_INVALID_ADDR;
-        return err_code;
-    }
-
-    NRF_LOG_INFO("Set threshold value : %d",threshold_str.threshold_data);
-    err_code=nrf_twi_sensor_reg_write(p_instance->p_sensor_data,
-                                      p_instance->sensor_addr,
-                                      threshold_str.reg_addr|0xA0,
-                                      (uint8_t *)&threshold_str,
-                                      TCS34725_THRESHOLD_BYTES);
-    return err_code;
-}
-
-ret_code_t tcs34725_read_threshold(tcs34725_instance_t const * p_instance, 
-                                   tcs34725_threshold_data_t * thr_data_str,
-                                   tcs34725_threshold_callback_t user_cb)
-{
-    ret_code_t err_code;
-//    static tcs34725_threshold_data_t thr_data_str;
-//
-//    if(thr_low_high==TCS34725_THRESHOLD_LOW)
-//    {
-//        thr_data_str.reg_addr=TCS34725_REG_THRESHOLD_LOW_L;
-//    }
-//    else if(thr_low_high==TCS34725_THRESHOLD_HIGH)
-//    {
-//        thr_data_str.reg_addr=TCS34725_REG_THRESHOLD_HIGH_L;
-//    }
-//    else
-//    {
-//        err_code=NRF_ERROR_INVALID_ADDR;
-//        return err_code;
-//    }
-
-    err_code=nrf_twi_sensor_reg_read(p_instance->p_sensor_data,
-                                     p_instance->sensor_addr,
-                                     thr_data_str->reg_addr|0xA0,
-                                     (nrf_twi_sensor_reg_cb_t) user_cb,
-                                     (uint8_t *) &thr_data_str,
-                                     TCS34725_THRESHOLD_BYTES);
-    return err_code;
 }
 
 ret_code_t tcs34725_int_clear(tcs34725_instance_t const * p_instance)

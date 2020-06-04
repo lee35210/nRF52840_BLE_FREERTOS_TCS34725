@@ -83,11 +83,11 @@
   <Watches active="0" update="Never"/>
  </Watch4>
  <Files>
-  <SessionOpenFile windowGroup="DockEditLeft" x="14" y="1196" useTextEdit="1" openedFrom="" useBinaryEdit="0" left="0" path="../../../main.c" selected="1" top="1175" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="61" y="248" useTextEdit="1" openedFrom="" useBinaryEdit="0" left="0" path="../../../tcs34725/tcs34725.c" selected="0" top="214" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="63" y="175" useTextEdit="1" openedFrom="C:/nRF/nRF5_SDK_16.0.0_98a08e2/examples/ble_peripheral/nRF52840_BLE_FREERTOS_TCS34725/main.c" useBinaryEdit="0" left="0" path="../../../tcs34725/tcs34725.h" selected="0" top="141" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="1270" useTextEdit="1" openedFrom="" useBinaryEdit="0" left="0" path="../../../main.c" selected="1" top="1257" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="248" useTextEdit="1" openedFrom="" useBinaryEdit="0" left="0" path="../../../tcs34725/tcs34725.c" selected="0" top="214" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="175" useTextEdit="1" openedFrom="C:/nRF/nRF5_SDK_16.0.0_98a08e2/examples/ble_peripheral/nRF52840_BLE_FREERTOS_TCS34725/main.c" useBinaryEdit="0" left="0" path="../../../tcs34725/tcs34725.h" selected="0" top="141" codecName="Default"/>
   <SessionOpenFile windowGroup="DockEditLeft" x="0" y="1779" useTextEdit="1" openedFrom="" useBinaryEdit="0" left="0" path="../../../../../../external/freertos/source/include/task.h" selected="0" top="1760" codecName="Default"/>
   <SessionOpenFile windowGroup="DockEditLeft" x="0" y="63" useTextEdit="1" openedFrom="" useBinaryEdit="0" left="0" path="../../../tcs34725/tcs34725_internal.h" selected="0" top="37" codecName="Default"/>
  </Files>
- <ARMCrossStudioWindow activeProject="ble_app_uart_tcs_pca10056_s140" fileDialogDefaultFilter="*.c" autoConnectTarget="J-Link" buildConfiguration="Release" sessionSettings="" debugSearchFileMap="C:/Program Files/SEGGER/SEGGER Embedded Studio for ARM 4.42a/source/thumb_crt0.s&#xa;C:/Program Files/SEGGER/SEGGER Embedded Studio for ARM 4.50/source/thumb_crt0.s" fileDialogInitialDirectory="C:/Program Files/SEGGER/SEGGER Embedded Studio for ARM 4.50/source" debugSearchPath="" autoConnectCapabilities="3711"/>
+ <ARMCrossStudioWindow activeProject="ble_app_uart_tcs_pca10056_s140" fileDialogDefaultFilter="*.c" autoConnectTarget="J-Link" buildConfiguration="Release" sessionSettings="" debugSearchFileMap="C:/Program Files/SEGGER/SEGGER Embedded Studio for ARM 4.42a/source/thumb_crt0.s&#xa;C:/Program Files/SEGGER/SEGGER Embedded Studio for ARM 4.50/source/thumb_crt0.s" fileDialogInitialDirectory="C:/Program Files/SEGGER/SEGGER Embedded Studio for ARM 4.50/source" debugSearchPath="" autoConnectCapabilities="3199"/>
 </session>
