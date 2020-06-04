@@ -941,6 +941,7 @@ int chartoint(char *char_value, uint8_t length)
 void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
 {
     static tcs34725_reg_data_t tcs_cmd_str={0};
+    tcs34725_threshold_data_t tcs_cmd_thr={0};
     ret_code_t err_code;
 
     if(strcmp(cmd_func_str->cmd,"RAR")==0)
@@ -1065,7 +1066,8 @@ void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
             NRF_LOG_INFO("Set Threshold Low fail");
             return;
         }
-        err_code=tcs34725_read_threshold(&tcs34725_instance, TCS34725_THRESHOLD_LOW, tcs34725_read_thr_cb);
+        tcs_cmd_thr.reg_addr=TCS34725_REG_THRESHOLD_LOW_L;
+        err_code=tcs34725_read_threshold(&tcs34725_instance, &tcs_cmd_thr, tcs34725_read_thr_cb);
         if(err_code!=NRF_SUCCESS)
         {
             NRF_LOG_INFO("Read Threshold Low fail");
@@ -1081,7 +1083,8 @@ void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
             NRF_LOG_INFO("Set Threshold High fail");
             return;
         }
-        err_code=tcs34725_read_threshold(&tcs34725_instance, TCS34725_THRESHOLD_HIGH, tcs34725_read_thr_cb);
+        tcs_cmd_thr.reg_addr=TCS34725_REG_THRESHOLD_HIGH_L;
+        err_code=tcs34725_read_threshold(&tcs34725_instance, &tcs_cmd_thr, tcs34725_read_thr_cb);
         if(err_code!=NRF_SUCCESS)
         {
             NRF_LOG_INFO("Read Threshold High fail");
@@ -1191,6 +1194,9 @@ void tcs34725_read_thr_cb(ret_code_t result, tcs34725_threshold_data_t * p_reg_d
     }
 
     char read_thr_cb_cmd[]="CMD";
+    p_reg_data->reg_addr&=0x1F;
+
+    NRF_LOG_INFO("Threshold CB : %X",p_reg_data->reg_addr);
 
     if(p_reg_data->reg_addr==TCS34725_REG_THRESHOLD_LOW_L)
     {
@@ -1321,11 +1327,11 @@ static void tcs_read_all_reg_thread(void *arg)
 //        vTaskDelay(10);
 
         all_reg_read_thr[0].reg_addr=TCS34725_REG_THRESHOLD_LOW_L;
-        tcs34725_read_threshold(&tcs34725_instance, TCS34725_THRESHOLD_LOW, tcs34725_read_thr_cb);
+        tcs34725_read_threshold(&tcs34725_instance, &all_reg_read_thr[0], tcs34725_read_thr_cb);
 //        vTaskDelay(10);
 
         all_reg_read_thr[1].reg_addr=TCS34725_REG_THRESHOLD_HIGH_L;
-        tcs34725_read_threshold(&tcs34725_instance, TCS34725_THRESHOLD_HIGH, tcs34725_read_thr_cb);
+        tcs34725_read_threshold(&tcs34725_instance, &all_reg_read_thr[1], tcs34725_read_thr_cb);
         
         #ifdef STACK_SIZE_CHK
         uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
@@ -1338,7 +1344,6 @@ static void tcs_read_all_reg_thread(void *arg)
 
         vPortFree(all_reg_read);
         vPortFree(all_reg_read_thr);
-//        uint16_t heap_left_size;
         heap_left_size=xPortGetFreeHeapSize();
         printf("3 left heap size : %d\r\n",heap_left_size);
         vTaskDelete(m_tcs_reg_all_send_thread);
@@ -1558,20 +1563,6 @@ void tcs34725_start()
     err_code=tcs34725_set_threshold(&tcs34725_instance, TCS34725_THRESHOLD_HIGH, 65535);
     APP_ERROR_CHECK(err_code);
 }
-
-void tcs34725_read_config()
-{
-    ret_code_t err_code;
-
-    tcs34725_read_all_config(&tcs34725_instance, tcs34725_read_reg_cb);
-
-    err_code=tcs34725_read_threshold(&tcs34725_instance, TCS34725_THRESHOLD_LOW, tcs34725_read_thr_cb);
-    APP_ERROR_CHECK(err_code);
-    nrf_delay_ms(10);
-    err_code=tcs34725_read_threshold(&tcs34725_instance, TCS34725_THRESHOLD_HIGH, tcs34725_read_thr_cb);
-    APP_ERROR_CHECK(err_code);
-}
-
 
 void in_pin_handler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action)
 {

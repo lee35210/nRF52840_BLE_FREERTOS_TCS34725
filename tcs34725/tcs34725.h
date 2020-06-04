@@ -173,7 +173,7 @@ ret_code_t tcs34725_set_threshold(tcs34725_instance_t const * p_instance,
                                   uint16_t threshold_val);
 
 ret_code_t tcs34725_read_threshold(tcs34725_instance_t const * p_instance, 
-                                   tcs34725_threshold_lh_t thr_low_high,
+                                   tcs34725_threshold_data_t * thr_data,
                                    tcs34725_threshold_callback_t user_cb);
 
 void tcs34725_read_all_config(tcs34725_instance_t const * p_instance, tcs34725_data_callback_t user_cb);
