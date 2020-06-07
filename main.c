@@ -940,8 +940,6 @@ int chartoint(char *char_value, uint8_t length)
 
 void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
 {
-//    static tcs34725_reg_data_t tcs_cmd_str={0};
-
     ret_code_t err_code;
 
     if((strcmp(cmd_func_str->cmd,"THL")==0)||(strcmp(cmd_func_str->cmd,"THH")==0))
@@ -983,7 +981,6 @@ void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
             }
         }
     }
-
     else
     {
         tcs34725_reg_data_t *tcs_cmd_str=(tcs34725_reg_data_t*)pvPortMalloc(sizeof(tcs34725_reg_data_t));
@@ -1132,13 +1129,11 @@ void tcs34725_read_reg_cb(ret_code_t result, tcs34725_reg_data_t * p_raw_data)
         case TCS34725_REG_TIMING :
             NRF_LOG_INFO("Timing register : %X",p_raw_data->reg_data);
             strcpy(read_reg_cb_cmd,"TIM");
-//            p_raw_data->reg_data=256-p_raw_data->reg_data;
             reg_value=256-p_raw_data->reg_data;
             break;
         case TCS34725_REG_WAIT_TIME :
             NRF_LOG_INFO("Wait time register : %X",p_raw_data->reg_data);
             strcpy(read_reg_cb_cmd,"WAT");
-//            p_raw_data->reg_data=256-p_raw_data->reg_data;
             reg_value=256-p_raw_data->reg_data;
             break;
         case TCS34725_REG_PERSISTENCE :
@@ -1266,9 +1261,6 @@ void tcs34725_rgbc_cb(ret_code_t result, tcs34725_rgbc_data_t * p_raw_data)
     tcs_rgbc_cb_str.red=(int)((double)p_raw_data->red/p_raw_data->clear*255);
     tcs_rgbc_cb_str.green=(int)((double)p_raw_data->green/p_raw_data->clear*255);
     tcs_rgbc_cb_str.blue=(int)((double)p_raw_data->blue/p_raw_data->clear*255);
-    
-//    printf("clear : %d, red : %d, blue : %d, green : %d\r\n",
-//            p_raw_data->clear,p_raw_data->red,p_raw_data->green,p_raw_data->blue);
 
     if(uxQueueSpacesAvailable(m_tcs_rgb_data_queue)!=0)
     {
@@ -1301,9 +1293,6 @@ static void tcs_read_all_reg_thread(void *arg)
     heap_left_size=xPortGetFreeHeapSize();
     printf("1 left heap size : %d\r\n",heap_left_size);
     
-    
-//    tcs34725_reg_data_t *all_reg_read=(tcs34725_reg_data_t*)pvPortMalloc(sizeof(tcs34725_reg_data_t)*8);
-
     tcs34725_reg_data_t *enable=(tcs34725_reg_data_t*)pvPortMalloc(sizeof(tcs34725_reg_data_t));
     tcs34725_reg_data_t *timing=(tcs34725_reg_data_t*)pvPortMalloc(sizeof(tcs34725_reg_data_t));
     tcs34725_reg_data_t *wait_time=(tcs34725_reg_data_t*)pvPortMalloc(sizeof(tcs34725_reg_data_t));
@@ -1313,7 +1302,6 @@ static void tcs_read_all_reg_thread(void *arg)
     tcs34725_reg_data_t *id=(tcs34725_reg_data_t*)pvPortMalloc(sizeof(tcs34725_reg_data_t));
     tcs34725_reg_data_t *status=(tcs34725_reg_data_t*)pvPortMalloc(sizeof(tcs34725_reg_data_t));
     
-
     tcs34725_threshold_data_t *threshold_low=(tcs34725_threshold_data_t*)pvPortMalloc(sizeof(tcs34725_threshold_data_t));
     tcs34725_threshold_data_t *threshold_high=(tcs34725_threshold_data_t*)pvPortMalloc(sizeof(tcs34725_threshold_data_t));
     
@@ -1322,43 +1310,6 @@ static void tcs_read_all_reg_thread(void *arg)
 
     while(1)
     {
-//        all_reg_read[0].reg_addr=TCS34725_REG_ENABLE;
-//        tcs34725_read_reg(&tcs34725_instance, &all_reg_read[0], tcs34725_read_reg_cb);
-////        vTaskDelay(10);
-//
-//        all_reg_read[1].reg_addr=TCS34725_REG_TIMING;
-//        tcs34725_read_reg(&tcs34725_instance, &all_reg_read[1], tcs34725_read_reg_cb);
-////        vTaskDelay(10);
-//        
-//        all_reg_read[2].reg_addr=TCS34725_REG_WAIT_TIME;
-//        tcs34725_read_reg(&tcs34725_instance, &all_reg_read[2], tcs34725_read_reg_cb);
-////        vTaskDelay(10);
-//        
-//        all_reg_read[3].reg_addr=TCS34725_REG_PERSISTENCE;
-//        tcs34725_read_reg(&tcs34725_instance, &all_reg_read[3], tcs34725_read_reg_cb);
-////        vTaskDelay(10);
-//        
-//        all_reg_read[4].reg_addr=TCS34725_REG_CONFIG;
-//        tcs34725_read_reg(&tcs34725_instance, &all_reg_read[4], tcs34725_read_reg_cb);
-////        vTaskDelay(10);
-//        
-//        all_reg_read[5].reg_addr=TCS34725_REG_CONTROL;
-//        tcs34725_read_reg(&tcs34725_instance, &all_reg_read[5], tcs34725_read_reg_cb);
-////        vTaskDelay(10);
-//        
-//        all_reg_read[6].reg_addr=TCS34725_REG_ID;
-//        tcs34725_read_reg(&tcs34725_instance, &all_reg_read[6], tcs34725_read_reg_cb);
-////        vTaskDelay(10);
-//        
-//        all_reg_read[7].reg_addr=TCS34725_REG_STATUS;
-//        tcs34725_read_reg(&tcs34725_instance, &all_reg_read[7], tcs34725_read_reg_cb);
-////        vTaskDelay(10);
-//
-//        threshold_low->reg_addr=TCS34725_REG_THRESHOLD_LOW_L;
-//        tcs34725_read_threshold(&tcs34725_instance, threshold_low, tcs34725_read_thr_cb);
-////        vTaskDelay(10);
-
-
         enable->reg_addr=TCS34725_REG_ENABLE;
         tcs34725_read_reg(&tcs34725_instance, enable, tcs34725_read_reg_cb);
 
@@ -1383,8 +1334,6 @@ static void tcs_read_all_reg_thread(void *arg)
         status->reg_addr=TCS34725_REG_STATUS;
         tcs34725_read_reg(&tcs34725_instance, status, tcs34725_read_reg_cb);
 
-
-
         threshold_low->reg_addr=TCS34725_REG_THRESHOLD_LOW_L;
         tcs34725_read_threshold(&tcs34725_instance, threshold_low, tcs34725_read_thr_cb);
 
@@ -1400,8 +1349,6 @@ static void tcs_read_all_reg_thread(void *arg)
         }
         #endif
 
-//        vPortFree(all_reg_read);
-//        vPortFree(all_reg_read_thr);
         heap_left_size=xPortGetFreeHeapSize();
         printf("3 left heap size : %d\r\n",heap_left_size);
         vTaskDelete(m_tcs_reg_all_send_thread);
