@@ -1109,15 +1109,14 @@ void tcs34725_cmd_func(tcs34725_cmd_t *cmd_func_str)
  */
 void tcs34725_read_reg_cb(ret_code_t result, tcs34725_reg_data_t * p_raw_data)
 {
-    char read_reg_cb_cmd[]="CMD";
-    uint8_t persistence_value;
-    uint16_t reg_value;
-
     if(result!=NRF_SUCCESS)
     {
         NRF_LOG_INFO("TCS34725 register read fail");
         return;
     }
+    char read_reg_cb_cmd[]="CMD";
+    uint8_t persistence_value;
+    uint16_t reg_value;
     p_raw_data->reg_addr&=0x1F;
 
     switch(p_raw_data->reg_addr)
@@ -1174,9 +1173,6 @@ void tcs34725_read_reg_cb(ret_code_t result, tcs34725_reg_data_t * p_raw_data)
     }
   
     vPortFree(p_raw_data);
-    uint16_t heap_left_size;
-    heap_left_size=xPortGetFreeHeapSize();
-    printf("reg cb : %d\r\n",heap_left_size);
 
     if(uxQueueSpacesAvailable(m_tcs_reg_data_queue)!=0)
     {
@@ -1193,7 +1189,6 @@ void tcs34725_read_reg_cb(ret_code_t result, tcs34725_reg_data_t * p_raw_data)
             NRF_LOG_INFO("TCS34725 READ REG CB : Queue overwrite fail");
         }
     }
-    
 }
 
 void tcs34725_read_thr_cb(ret_code_t result, tcs34725_threshold_data_t * p_reg_data)
@@ -1225,9 +1220,6 @@ void tcs34725_read_thr_cb(ret_code_t result, tcs34725_threshold_data_t * p_reg_d
     sprintf(tcs_ble_send_str.send_data,"%s%5d",read_thr_cb_cmd,p_reg_data->threshold_data);
 
     vPortFree(p_reg_data);
-    uint16_t heap_left_size;
-    heap_left_size=xPortGetFreeHeapSize();
-    printf("thr cb : %d\r\n",heap_left_size);
 
     if(uxQueueSpacesAvailable(m_tcs_reg_data_queue)!=0)
     {
@@ -1288,10 +1280,6 @@ static void tcs_read_all_reg_thread(void *arg)
     uxHighWaterMark2=uxTaskGetStackHighWaterMark(NULL);
     uint8_t stack_left=255;
     #endif
-
-    uint16_t heap_left_size;
-    heap_left_size=xPortGetFreeHeapSize();
-    printf("1 left heap size : %d\r\n",heap_left_size);
     
     tcs34725_reg_data_t *enable=(tcs34725_reg_data_t*)pvPortMalloc(sizeof(tcs34725_reg_data_t));
     tcs34725_reg_data_t *timing=(tcs34725_reg_data_t*)pvPortMalloc(sizeof(tcs34725_reg_data_t));
@@ -1304,9 +1292,6 @@ static void tcs_read_all_reg_thread(void *arg)
     
     tcs34725_threshold_data_t *threshold_low=(tcs34725_threshold_data_t*)pvPortMalloc(sizeof(tcs34725_threshold_data_t));
     tcs34725_threshold_data_t *threshold_high=(tcs34725_threshold_data_t*)pvPortMalloc(sizeof(tcs34725_threshold_data_t));
-    
-    heap_left_size=xPortGetFreeHeapSize();
-    printf("2 left heap size : %d\r\n",heap_left_size);
 
     while(1)
     {
@@ -1348,10 +1333,6 @@ static void tcs_read_all_reg_thread(void *arg)
             printf("Available stack size of thread reading all TCS34725 register : %d\r\n",stack_left);
         }
         #endif
-
-        heap_left_size=xPortGetFreeHeapSize();
-        printf("3 left heap size : %d\r\n",heap_left_size);
-        vTaskDelete(m_tcs_reg_all_send_thread);
     }
 }
 

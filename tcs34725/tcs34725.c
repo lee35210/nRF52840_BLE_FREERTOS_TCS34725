@@ -8,6 +8,30 @@
 #include <stdio.h>
 #include <string.h>
 
+
+ret_code_t tcs34725_init(tcs34725_instance_t const * p_instance)
+{
+    //int enable, wait enable, rgbc enable, power on/off
+    ret_code_t err_code;
+    tcs34725_reg_data_t enable_reg;
+
+    tcs34725_config_enable_t init_config;
+    init_config.rgbc_interrupt=false;   //bit4
+    init_config.wait_enable=true;       //bit3
+    init_config.rgbc_enable=true;       //bit1
+    init_config.power_on=true;          //bit0
+
+//    err_code=tcs34725_set_init(p_instance, &init_config);
+    enable_reg.reg_addr=TCS34725_REG_ENABLE;
+    enable_reg.reg_data=(init_config.rgbc_interrupt << TCS34725_INT_POS)|
+                        (init_config.wait_enable << TCS34725_WAIT_POS)|
+                        (init_config.rgbc_enable << TCS34725_RGBC_ENABLE_POS)|
+                        (init_config.power_on << TCS34725_POWER_ON_POS);
+
+    err_code=tcs34725_write_reg(p_instance, &enable_reg);
+    return err_code;
+}
+
 ret_code_t tcs34725_write_reg(tcs34725_instance_t const * p_instance,
                               tcs34725_reg_data_t *       p_reg_data)
 {
@@ -35,21 +59,6 @@ ret_code_t tcs34725_read_threshold(tcs34725_instance_t const * p_instance,
                                    tcs34725_threshold_callback_t user_cb)
 {
     ret_code_t err_code;
-//    static tcs34725_threshold_data_t thr_data_str;
-//
-//    if(thr_low_high==TCS34725_THRESHOLD_LOW)
-//    {
-//        thr_data_str.reg_addr=TCS34725_REG_THRESHOLD_LOW_L;
-//    }
-//    else if(thr_low_high==TCS34725_THRESHOLD_HIGH)
-//    {
-//        thr_data_str.reg_addr=TCS34725_REG_THRESHOLD_HIGH_L;
-//    }
-//    else
-//    {
-//        err_code=NRF_ERROR_INVALID_ADDR;
-//        return err_code;
-//    }
 
     err_code=nrf_twi_sensor_reg_read(p_instance->p_sensor_data,
                                      p_instance->sensor_addr,
@@ -89,58 +98,6 @@ ret_code_t tcs34725_set_threshold(tcs34725_instance_t const * p_instance,
                                       (uint8_t *)&threshold_str,
                                       TCS34725_THRESHOLD_BYTES);
     return err_code;
-}
-
-ret_code_t tcs34725_init(tcs34725_instance_t const * p_instance)
-{
-    //int enable, wait enable, rgbc enable, power on/off
-    ret_code_t err_code;
-    tcs34725_reg_data_t enable_reg;
-
-    tcs34725_config_enable_t init_config;
-    init_config.rgbc_interrupt=false;   //bit4
-    init_config.wait_enable=true;       //bit3
-    init_config.rgbc_enable=true;       //bit1
-    init_config.power_on=true;          //bit0
-
-//    err_code=tcs34725_set_init(p_instance, &init_config);
-    enable_reg.reg_addr=TCS34725_REG_ENABLE;
-    enable_reg.reg_data=(init_config.rgbc_interrupt << TCS34725_INT_POS)|
-                        (init_config.wait_enable << TCS34725_WAIT_POS)|
-                        (init_config.rgbc_enable << TCS34725_RGBC_ENABLE_POS)|
-                        (init_config.power_on << TCS34725_POWER_ON_POS);
-
-    err_code=tcs34725_write_reg(p_instance, &enable_reg);
-    return err_code;
-}
-
-void tcs34725_read_all_config(tcs34725_instance_t const * p_instance, tcs34725_data_callback_t user_cb)
-{
-    static tcs34725_reg_data_t enable,timing,waittime,persistence,config,control,id,status;
-
-    enable.reg_addr=TCS34725_REG_ENABLE;
-    tcs34725_read_reg(p_instance, &enable, user_cb);
-
-    timing.reg_addr=TCS34725_REG_TIMING;
-    tcs34725_read_reg(p_instance, &timing, user_cb);
-
-    waittime.reg_addr=TCS34725_REG_WAIT_TIME;
-    tcs34725_read_reg(p_instance, &waittime, user_cb);
-
-    persistence.reg_addr=TCS34725_REG_PERSISTENCE;
-    tcs34725_read_reg(p_instance, &persistence, user_cb);
-
-    config.reg_addr=TCS34725_REG_CONFIG;
-    tcs34725_read_reg(p_instance, &config, user_cb);
-
-    control.reg_addr=TCS34725_REG_CONTROL;
-    tcs34725_read_reg(p_instance, &control, user_cb);
-
-    id.reg_addr=TCS34725_REG_ID;
-    tcs34725_read_reg(p_instance, &id, user_cb);
-
-    status.reg_addr=TCS34725_REG_STATUS;
-    tcs34725_read_reg(p_instance, &status, user_cb);
 }
 
 ret_code_t tcs34725_set_timing(tcs34725_instance_t const * p_instance,

@@ -11,24 +11,9 @@
 
 // Minimum nrf_twi_sensor message buffer size and nrf_twi_mngr queue length.
 #define TCS34725_MIN_QUEUE_SIZE 20
-
-/**
- * @brief Macro creating mlx90614 sensor instance.
- *
- * @param[in] _mlx90614_inst_name    Sensor instance name.
- * @param[in] _p_twi_sensor         Pointer to common TWI sensor instance.
- * @param[in] _sensor_address       Sensor base address.
- */
 #define TCS34725_INSTANCE_DEF(_tcs34725_inst_name, _p_twi_sensor, _sensor_address)                \
     TCS34725_INTERNAL_INSTANCE_DEF(_tcs34725_inst_name, _p_twi_sensor, _sensor_address)
 
-
-/*
-- MLX9061 transfer struct
-reg_data : save data reading from mlx90614 or be written in mlx90614 register.
-pec : Packet Error Code
-reg_addr : MLX90614 Register Address
-*/
 typedef struct
 {
     uint8_t reg_data;
